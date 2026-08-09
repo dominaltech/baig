@@ -1,0 +1,21 @@
+{
+  "name": "Baig Tiles & Granite CRM",
+  "short_name": "BaigTiles",
+  "description": "Offline-First CRM & Estimate Billing Software for Baig Tiles & Granite, Solapur",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0a2540",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

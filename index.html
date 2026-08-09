@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baig Tiles & Granite - CRM & Billing</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0a2540">
+  
+  <!-- Typography Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Favicon & PWA Icon -->
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  
+  <!-- Canvas & PDF Libraries for Offline High-Quality Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-container">
+      <img src="./icons/icon-192.png" alt="BT Logo" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fde047; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+      <div>
+        <h1 class="brand-title" data-i18n="appName">Baig Tiles & Granite</h1>
+        <div class="brand-subtitle" data-i18n="appSubtitle">Solapur • Estimate Billing & CRM</div>
+      </div>
+    </div>
+
+    <!-- Global Search -->
+    <div class="header-search">
+      <input type="text" id="globalSearchInput" placeholder="Search bills, products, customers..." data-i18n-placeholder="searchPlaceholder">
+      <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    </div>
+
+    <!-- Controls: Role Toggle & Language -->
+    <div class="header-controls">
+      <div class="role-badge-toggle">
+        <button id="roleOwnerBtn" class="role-btn active" onclick="window.appRouter.setRole('owner')" data-i18n="roleOwner">Owner Mode</button>
+        <button id="roleStaffBtn" class="role-btn" onclick="window.appRouter.setRole('staff')" data-i18n="roleStaff">Staff Mode</button>
+      </div>
+
+      <select id="languageSelect" class="lang-select" onchange="window.appRouter.onLanguageChange(this.value)">
+        <option value="en">English</option>
+        <option value="hi">हिंदी (Hindi)</option>
+        <option value="mr">मराठी (Marathi)</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- App Main Navigation -->
+  <nav class="app-nav">
+    <a class="nav-link active" data-view="billing" onclick="window.appRouter.switchView('billing')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+      <span data-i18n="navCreateBill">New Bill</span>
+    </a>
+    <a class="nav-link" data-view="bills" onclick="window.appRouter.switchView('bills')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      <span data-i18n="navBillsList">Bills History</span>
+    </a>
+    <a class="nav-link" data-view="inventory" onclick="window.appRouter.switchView('inventory')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      <span data-i18n="navInventory">Products & Stock</span>
+      <span id="lowStockBadgeCount" class="badge badge-lowstock" style="display: none; margin-left: 4px;">0</span>
+    </a>
+    <a class="nav-link" data-view="customers" onclick="window.appRouter.switchView('customers')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      <span data-i18n="navCustomers">Customers</span>
+    </a>
+    <a class="nav-link" data-view="dues" onclick="window.appRouter.switchView('dues')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+      <span data-i18n="navDues">Pending Dues (Khata)</span>
+    </a>
+    <a id="navAnalyticsLink" class="nav-link" data-view="analytics" onclick="window.appRouter.switchView('analytics')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+      <span data-i18n="navAnalytics">Analytics</span>
+    </a>
+    <a class="nav-link" data-view="settings" onclick="window.appRouter.switchView('settings')">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <span data-i18n="navSettings">Settings</span>
+    </a>
+  </nav>
+
+  <!-- Main Content Layout -->
+  <main class="app-content">
+
+    <!-- VIEW 1: CREATE BILLING -->
+    <section id="view-billing" class="view-section active">
+      <div class="section-header">
+        <h2 id="billingFormTitle" class="section-title" data-i18n="createEstimateTitle">Create Estimate Bill</h2>
+        <div class="section-actions">
+          <span id="billNumberDisplay" class="bill-number-display">No. 942</span>
+        </div>
+      </div>
+
+      <!-- Customer Details Card -->
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 0.75rem;" data-i18n="customerDetails">Customer Information</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+          
+          <div class="form-group">
+            <label class="form-label" data-i18n="selectCustomer">Select Existing Customer</label>
+            <select id="customerSelect" class="form-control" onchange="window.billingManager.onCustomerSelectChange(this.value)">
+              <option value="">-- Select Existing Customer --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="customerName">Customer Name / To</label>
+            <input type="text" id="customerNameInput" class="form-control" placeholder="e.g. Laxmibai Pandurang Madam">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="customerPhone">Mobile No.</label>
+            <input type="tel" id="customerPhoneInput" class="form-control" placeholder="e.g. 6300867296">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="billDate">Bill Date</label>
+            <input type="date" id="billDateInput" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label class="form-label" data-i18n="customerAddress">Address</label>
+          <input type="text" id="customerAddressInput" class="form-control" placeholder="e.g. Pitalapur, Solapur" style="margin-bottom: 8px;">
+          
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" id="voiceMicBtnEn" class="btn btn-sm btn-outline-primary" onclick="window.voiceManager.startVoiceInput('en-IN', 'customerAddressInput', 'voiceMicBtnEn')" title="Speak address in English">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg>
+              Speak (English)
+            </button>
+            <button type="button" id="voiceMicBtnMr" class="btn btn-sm btn-outline-primary" onclick="window.voiceManager.startVoiceInput('mr-IN', 'customerAddressInput', 'voiceMicBtnMr')" title="मराठीत पत्ता बोला">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg>
+              मराठी मध्ये बोला
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line Items Table Card -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1rem; color: var(--accent-blue);">Particulars & Items</h3>
+          <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.addLineItem()" data-i18n="addItem">+ Add Line Item</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 14%;" data-i18n="colTilesNo">Tiles No.</th>
+                <th style="width: 44%;" data-i18n="colParticulars">Particulars</th>
+                <th style="width: 12%;" data-i18n="colBoxes">Boxes</th>
+                <th style="width: 12%;" data-i18n="colRate">Rate (₹)</th>
+                <th style="width: 12%;" data-i18n="colAmount">Amount (₹)</th>
+                <th style="width: 6%;" data-i18n="colAction">Action</th>
+              </tr>
+            </thead>
+            <tbody id="billLineItemsBody">
+              <!-- Rendered dynamically by billing.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bill Totals & Khata Calculations Box -->
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
+          <div style="width: 100%; max-width: 380px; background-color: var(--bg-main); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+              <span data-i18n="subtotal">Subtotal:</span>
+              <strong id="calcSubtotal">₹0</strong>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
+              <span data-i18n="previousDues">Previous Dues (मागील):</span>
+              <input type="number" id="previousDuesInput" class="form-control" style="width: 110px; text-align: right; padding: 2px 6px;" value="0" oninput="window.billingManager.calculateTotals()">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
+              <span data-i18n="roundOff">Round Off:</span>
+              <input type="number" id="roundOffInput" class="form-control" style="width: 110px; text-align: right; padding: 2px 6px;" value="0" oninput="window.billingManager.calculateTotals()">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 2px solid var(--accent-blue); font-size: 1.1rem; color: var(--accent-blue);">
+              <strong data-i18n="grandTotal">Grand Total:</strong>
+              <strong id="calcGrandTotal">₹0</strong>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.9rem;">
+              <span data-i18n="advancePaid">Cash / Adv Paid:</span>
+              <input type="number" id="advancePaidInput" class="form-control" style="width: 110px; text-align: right; padding: 2px 6px;" value="0" oninput="window.billingManager.calculateTotals()">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid var(--border-dark); font-size: 1rem; color: var(--danger);">
+              <strong data-i18n="balanceDue">Balance Due (बाकी):</strong>
+              <strong id="calcBalanceDue">₹0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Billing Action Buttons -->
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+          <button class="btn btn-secondary" onclick="window.billingManager.viewBillPreview()" data-i18n="btnPreview">Preview Bill</button>
+          <button class="btn btn-outline-primary" onclick="window.billingManager.saveBill('draft')" data-i18n="btnSaveDraft">Save Draft</button>
+          <button class="btn btn-success btn-lg" onclick="window.billingManager.saveBill('finalized')" data-i18n="btnFinalize">Finalize & Print</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: BILLS HISTORY LIST -->
+    <section id="view-bills" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="navBillsList">Bills History</h2>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Bill No.</th>
+              <th>Customer Name</th>
+              <th>Date</th>
+              <th>Items</th>
+              <th>Total Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="billsListTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 3: INVENTORY & STOCK -->
+    <section id="view-inventory" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="inventoryTitle">Product Inventory & Stock</h2>
+        <div class="section-actions">
+          <select id="inventoryCategoryFilter" class="form-control" style="width: auto;" onchange="window.inventoryManager.filterByCategory(this.value)">
+            <option value="all">All Categories</option>
+            <option value="2x4">2x4 Tiles</option>
+            <option value="12x18">12x18 Tiles</option>
+            <option value="16x16">16x16 Tiles</option>
+            <option value="Granite">Granite</option>
+            <option value="Bag">Chemical Bags</option>
+          </select>
+          <button class="btn btn-primary" onclick="window.inventoryManager.openAddModal()" data-i18n="addProduct">+ Add Product</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>Size / Category</th>
+              <th>Unit Rate (₹)</th>
+              <th>Current Stock</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 4: CUSTOMERS DATABASE -->
+    <section id="view-customers" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="customersTitle">Customer Database</h2>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Customer Name</th>
+              <th>Mobile No.</th>
+              <th>Address</th>
+              <th>Total Purchases</th>
+              <th>Pending Dues</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customersTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 5: PENDING DUES (KHATA) -->
+    <section id="view-dues" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="duesTitle">Pending Customer Dues (Khata)</h2>
+        <div class="section-actions">
+          <span style="font-weight: 600; color: var(--text-muted);">Total Outstanding:</span>
+          <strong id="totalPendingDuesStat" style="font-size: 1.2rem; color: var(--danger);">₹0</strong>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Bill No.</th>
+              <th>Customer Name</th>
+              <th>Bill Date</th>
+              <th>Total Amount</th>
+              <th>Paid Amount</th>
+              <th>Balance Due</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="duesTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 6: ANALYTICS (OWNER ONLY) -->
+    <section id="view-analytics" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="analyticsTitle">Business Sales Analytics</h2>
+      </div>
+
+      <div class="grid-stats">
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label">Total Revenue</div>
+            <div id="statTotalRevenue" class="stat-value">₹0</div>
+          </div>
+          <div class="stat-icon-wrapper">
+            <svg class="svg-icon" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label" data-i18n="weeklySales">Weekly Sales</div>
+            <div id="statWeeklySales" class="stat-value">₹0</div>
+          </div>
+          <div class="stat-icon-wrapper">
+            <svg class="svg-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label" data-i18n="monthlySales">Monthly Sales</div>
+            <div id="statMonthlySales" class="stat-value">₹0</div>
+          </div>
+          <div class="stat-icon-wrapper">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label" data-i18n="totalBills">Total Bills</div>
+            <div id="statTotalBills" class="stat-value">0</div>
+          </div>
+          <div class="stat-icon-wrapper">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 1rem;">Daily / Weekly Sales Revenue Chart</h3>
+        <canvas id="salesChartCanvas"></canvas>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 1rem;" data-i18n="topProducts">Top Selling Products</h3>
+        <div id="topProductsList"></div>
+      </div>
+    </section>
+
+    <!-- VIEW 7: SETTINGS -->
+    <section id="view-settings" class="view-section">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="settingsTitle">App Settings & Data Export</h2>
+      <div class="card" style="background-color: var(--accent-blue-light); border-color: var(--accent-blue);">
+        <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 0.5rem;" data-i18n="installAppLabel">Install Application (Mobile & PC)</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Install Baig Tiles & Granite CRM as a standalone app directly on your Desktop PC or Mobile device for full offline access.</p>
+        <button id="installPwaBtn" class="btn btn-primary btn-lg" onclick="window.appRouter.triggerPwaInstall()" data-i18n="btnInstallApp">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Install App
+        </button>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 1rem;" data-i18n="exportDataLabel">Download Business Data (Offline CSV)</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Export finalized bill records directly to CSV spreadsheets for accounting and record keeping.</p>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="window.appRouter.exportDataCSV('weekly')" data-i18n="btnExportWeekly">Download Weekly CSV</button>
+          <button class="btn btn-outline-primary" onclick="window.appRouter.exportDataCSV('monthly')" data-i18n="btnExportMonthly">Download Monthly CSV</button>
+        </div>
+      </div>
+
+      <div class="card" style="border-color: #fca5a5;">
+        <h3 style="font-size: 1rem; color: var(--danger); margin-bottom: 1rem;" data-i18n="wipeDataLabel">Reset / Clear All Data</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Wipes custom bills/customers and resets database back to initial seed data state.</p>
+        <button class="btn btn-danger" onclick="window.appRouter.resetAllData()" data-i18n="btnWipeData">Reset to Initial Seed Data</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: ADD/EDIT PRODUCT -->
+  <div id="productFormModal" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="productFormModalTitle" class="modal-title">Add Product</h3>
+        <button class="modal-close" onclick="window.appRouter.closeModal('productFormModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="productIdInput">
+        
+        <div class="form-group">
+          <label class="form-label" data-i18n="productName">Product Name</label>
+          <input type="text" id="productNameInput" class="form-control" placeholder="e.g. COSMOS NERO GL">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="productSize">Size / Category</label>
+          <select id="productSizeInput" class="form-control">
+            <option value="2x4">2x4 Tiles</option>
+            <option value="12x18">12x18 Tiles</option>
+            <option value="16x16">16x16 Tiles</option>
+            <option value="Granite">Granite</option>
+            <option value="Bag">Chemical Bag</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Rate per Box / Unit (₹)</label>
+          <input type="number" id="productRateInput" class="form-control" placeholder="e.g. 45">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="currentStock">Current Stock (Boxes)</label>
+          <input type="number" id="productStockInput" class="form-control" placeholder="e.g. 150">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="minStockAlert">Min Stock Alert Threshold</label>
+          <input type="number" id="productMinAlertInput" class="form-control" value="15">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.appRouter.closeModal('productFormModal')" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-primary" onclick="window.inventoryManager.saveProductFromModal()" data-i18n="btnSave">Save Product</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CUSTOMER PURCHASE HISTORY LEDGER -->
+  <div id="customerHistoryModal" class="modal-backdrop">
+    <div class="modal-container large">
+      <div class="modal-header">
+        <h3 id="historyCustomerName" class="modal-title">Customer History</h3>
+        <button class="modal-close" onclick="window.appRouter.closeModal('customerHistoryModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="historyCustomerMeta" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"></div>
+        <div id="customerHistoryList"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.appRouter.closeModal('customerHistoryModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: RECEIVE KHATA PAYMENT -->
+  <div id="receivePaymentModal" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" data-i18n="receivePayment">Receive Payment</h3>
+        <button class="modal-close" onclick="window.appRouter.closeModal('receivePaymentModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background-color: var(--accent-blue-light); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
+          <strong id="payCustomerName" style="font-size: 1rem; color: var(--accent-blue);">Customer</strong><br>
+          <small id="payBillNo" style="color: var(--text-muted);">Bill No.</small>
+          <div style="margin-top: 4px;">
+            Current Outstanding Balance: <strong id="payCurrentBalance" style="color: var(--danger);">₹0</strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="payAmount">Payment Amount Received (₹)</label>
+          <input type="number" id="paymentAmountInput" class="form-control" placeholder="Enter amount">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.appRouter.closeModal('receivePaymentModal')" data-i18n="btnCancel">Cancel</button>
+        <button class="btn btn-success" onclick="window.duesManager.submitPayment()" data-i18n="btnSave">Record Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: PIXEL-FAITHFUL ESTIMATE BILL PREVIEW & PRINT -->
+  <div id="billPreviewModal" class="modal-backdrop">
+    <div class="modal-container large">
+      <div class="modal-header">
+        <h3 class="modal-title">Estimate Bill Preview</h3>
+        <button class="modal-close" onclick="window.appRouter.closeModal('billPreviewModal')">✕</button>
+      </div>
+      <div class="modal-body" style="background-color: #f1f5f9; padding: 1.5rem;">
+        <div id="printableBillEstimateModalContent">
+          <!-- Rendered dynamically by billing.js -->
+        </div>
+      </div>
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 0.5rem;">
+        <button class="btn btn-secondary" onclick="window.appRouter.closeModal('billPreviewModal')" data-i18n="btnCancel">Close</button>
+        <button class="btn btn-outline-primary" onclick="window.billingManager.downloadBillPDF()">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line></svg>
+          <span data-i18n="btnDownloadPDF">Download PDF</span>
+        </button>
+        <button class="btn btn-outline-primary" onclick="window.billingManager.downloadBillImage()">
+          <svg class="svg-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <span data-i18n="btnDownloadImage">Download Image</span>
+        </button>
+        <button class="btn btn-primary btn-lg" onclick="window.billingManager.triggerPrint()" data-i18n="btnPrint">Print Estimate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subtle Branding Badge -->
+  <div class="dominal-corner-tag">CRM by Dominal Technology</div>
+
+  <!-- Scripts Layer -->
+  <script src="./js/db.js"></script>
+  <script src="./js/i18n.js"></script>
+  <script src="./js/voice.js"></script>
+  <script src="./js/inventory.js"></script>
+  <script src="./js/customers.js"></script>
+  <script src="./js/dues.js"></script>
+  <script src="./js/analytics.js"></script>
+  <script src="./js/billing.js"></script>
+  <script src="./js/app.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
+          .catch(err => console.log('PWA ServiceWorker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
