@@ -1,9 +1,10 @@
 /* 
   Baig Tiles & Granite CRM - Service Worker (sw.js)
-  Provides full offline caching for PWA functionality.
+  Network-First Strategy for Instant Deployment Updates (Vercel / GitHub)
+  Falls back to Cache for 100% Offline Access.
 */
 
-const CACHE_NAME = 'baig-tiles-crm-v1';
+const CACHE_NAME = 'baig-tiles-crm-v2.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -22,53 +23,62 @@ const ASSETS_TO_CACHE = [
   './icons/icon-512.png'
 ];
 
+// Install Event - Pre-cache essential assets
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Force active immediately
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching static assets');
+      console.log('[Service Worker v2.0] Caching static assets');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-  self.skipWaiting();
 });
 
+// Activate Event - Clean up old cache versions (v1, etc.)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cache);
+            console.log('[Service Worker] Evicting stale cache:', cache);
             return caches.delete(cache);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Claim clients immediately
   );
-  self.clients.claim();
 });
 
+// Fetch Event - NETWORK FIRST strategy for instant Vercel/GitHub updates
 self.addEventListener('fetch', (event) => {
+  // Ignore non-GET requests
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((response) => {
-        // Cache external scripts like html2canvas/jspdf dynamically
-        if (response && response.status === 200 && (event.request.url.includes('cdnjs.cloudflare.com') || event.request.url.includes('fonts.googleapis.com'))) {
-          const responseClone = response.clone();
+    fetch(event.request)
+      .then((networkResponse) => {
+        // If network request succeeds, update the cache with fresh version from Vercel
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
+            cache.put(event.request, responseToCache);
           });
         }
-        return response;
-      }).catch(() => {
-        // Return offline fallback if network fails
-        if (event.request.headers && event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
-        }
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        // Network failed (Offline mode) -> Serve from local Cache Storage
+        console.log('[Service Worker] Network offline, serving from cache:', event.request.url);
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Fallback to index.html for page navigation offline
+          if (event.request.headers && event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });
