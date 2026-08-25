@@ -991,6 +991,192 @@ body {
   }
 }
 
+/* Bill Type Segmented Toggle Buttons */
+.bill-type-btn {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bill-type-btn.active {
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ==========================================================================
+   GST TAX INVOICE REPLICA (MATCHING UPLOADED PAPER INVOICE IMAGE EXACTLY)
+   ========================================================================== */
+
+.bill-gst-container {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  border: 1.5px solid #742220;
+  padding: 0;
+  font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+  color: #000000;
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+.bill-gst-top-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1.5px solid #742220;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.tax-invoice-capsule {
+  border: 1px solid #742220;
+  background-color: #742220;
+  color: #ffffff;
+  padding: 2px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.bill-gst-header-main {
+  text-align: center;
+  padding: 8px 12px 6px;
+  border-bottom: 1.5px solid #742220;
+}
+
+.bill-gst-title {
+  color: #742220;
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-family: 'Times New Roman', Georgia, serif;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.bill-gst-subtitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #000000;
+  margin-top: 2px;
+}
+
+.bill-gst-meta-box {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  border-bottom: 1.5px solid #742220;
+  font-size: 0.85rem;
+}
+
+.gst-meta-left {
+  padding: 8px 12px;
+  border-right: 1.5px solid #742220;
+}
+
+.gst-meta-right {
+  padding: 8px 12px;
+}
+
+.gst-meta-line {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.gst-meta-line:last-child {
+  margin-bottom: 0;
+}
+
+.bill-gst-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.bill-gst-table th {
+  background-color: #742220;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 6px 4px;
+  border: 1px solid #742220;
+  text-align: center;
+}
+
+.bill-gst-table td {
+  border: 1px solid #742220;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #000000;
+  height: 28px;
+  vertical-align: middle;
+}
+
+.bill-gst-bottom-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  border-top: 1.5px solid #742220;
+  border-bottom: 1.5px solid #742220;
+}
+
+.gst-bank-details {
+  padding: 8px 12px;
+  border-right: 1.5px solid #742220;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gst-tax-breakdown {
+  padding: 0;
+}
+
+.gst-tax-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-bottom: 1px solid #742220;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gst-tax-row:last-child {
+  border-bottom: none;
+}
+
+.gst-tax-row.total-row {
+  font-weight: 900;
+  font-size: 1rem;
+  color: #742220;
+  background-color: #fdf2f2;
+}
+
+.bill-gst-footer {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.gst-words-line {
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.gst-signatures-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 20px;
+  font-weight: 800;
+}
+
 /* Strict Print Stylesheet */
 @media print {
   body * {
@@ -998,17 +1184,20 @@ body {
   }
   
   .bill-estimate-container,
-  .bill-estimate-container * {
+  .bill-estimate-container *,
+  .bill-gst-container,
+  .bill-gst-container * {
     visibility: visible;
   }
 
-  .bill-estimate-container {
+  .bill-estimate-container,
+  .bill-gst-container {
     position: absolute;
     left: 0;
     top: 0;
     width: 100% !important;
     max-width: 100% !important;
-    border: none !important;
+    border: 1.5px solid #742220 !important;
     box-shadow: none !important;
   }
 
@@ -1032,3 +1221,4 @@ body {
     display: none !important;
   }
 }
+

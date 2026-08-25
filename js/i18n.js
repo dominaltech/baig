@@ -21,7 +21,10 @@ const translations = {
     roleStaff: "Staff Mode",
     
     // Billing View
+    createBillTitle: "Create Bill",
     createEstimateTitle: "Create Estimate Bill",
+    billTypeEstimate: "Estimate Bill",
+    billTypeGst: "GST Tax Invoice",
     customerDetails: "Customer Information",
     customerName: "Customer Name / To",
     customerPhone: "Mobile No.",

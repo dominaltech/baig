@@ -174,14 +174,19 @@ class AppRouter {
 
     tableBody.innerHTML = bills.map(b => `
       <tr>
-        <td><strong>No. ${b.billNo || 'Draft'}</strong></td>
+        <td>
+          <strong>No. ${b.billNo || 'Draft'}</strong><br>
+          <span class="badge ${b.billType === 'gst' ? 'badge-finalized' : 'badge-partial'}" style="font-size: 0.65rem;">
+            ${b.billType === 'gst' ? 'GST INVOICE' : 'ESTIMATE'}
+          </span>
+        </td>
         <td>
           <strong>${b.customerName}</strong><br>
           <small style="color: var(--text-muted);">${b.customerPhone || 'N/A'}</small>
         </td>
         <td>${b.date}</td>
         <td>${(b.items || []).length} items</td>
-        <td><strong>₹${(b.total || 0).toLocaleString('en-IN')}</strong></td>
+        <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
         <td>
           <span class="badge ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'badge-partial' : 'badge-paid') : 'badge-draft'}">
             ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'FINALIZED (DUE)' : 'FINALIZED (PAID)') : 'DRAFT'}

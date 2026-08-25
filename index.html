@@ -94,7 +94,20 @@
     <!-- VIEW 1: CREATE BILLING -->
     <section id="view-billing" class="view-section active">
       <div class="section-header">
-        <h2 id="billingFormTitle" class="section-title" data-i18n="createEstimateTitle">Create Estimate Bill</h2>
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <h2 id="billingFormTitle" class="section-title" data-i18n="createBillTitle">Create Bill</h2>
+          
+          <!-- Mode Toggle: Estimate vs GST Tax Invoice -->
+          <div class="bill-type-toggle-container" style="display: inline-flex; background-color: #e2e8f0; padding: 3px; border-radius: 8px; border: 1px solid var(--border-dark);">
+            <button type="button" id="billTypeEstimateBtn" class="bill-type-btn active" onclick="window.billingManager.setBillType('estimate')">
+              📄 Estimate Bill
+            </button>
+            <button type="button" id="billTypeGstBtn" class="bill-type-btn" onclick="window.billingManager.setBillType('gst')">
+              🧾 GST Tax Invoice
+            </button>
+          </div>
+        </div>
+
         <div class="section-actions">
           <span id="billNumberDisplay" class="bill-number-display">No. 942</span>
         </div>
@@ -103,7 +116,7 @@
       <!-- Customer Details Card -->
       <div class="card">
         <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 0.75rem;" data-i18n="customerDetails">Customer Information</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
           
           <div class="form-group">
             <label class="form-label" data-i18n="selectCustomer">Select Existing Customer</label>
@@ -114,12 +127,17 @@
 
           <div class="form-group">
             <label class="form-label" data-i18n="customerName">Customer Name / To</label>
-            <input type="text" id="customerNameInput" class="form-control" placeholder="e.g. Laxmibai Pandurang Madam">
+            <input type="text" id="customerNameInput" class="form-control" placeholder="e.g. Shri Mahavir Urban Co-op Bank">
           </div>
 
           <div class="form-group">
             <label class="form-label" data-i18n="customerPhone">Mobile No.</label>
-            <input type="tel" id="customerPhoneInput" class="form-control" placeholder="e.g. 6300867296">
+            <input type="tel" id="customerPhoneInput" class="form-control" placeholder="e.g. 9822145890">
+          </div>
+
+          <div id="gstinFieldGroup" class="form-group gst-field-only" style="display: none;">
+            <label class="form-label">Customer GSTIN</label>
+            <input type="text" id="customerGstinInput" class="form-control" placeholder="e.g. 27AAAAA57038P1ZX">
           </div>
 
           <div class="form-group">
@@ -130,7 +148,7 @@
 
         <div class="form-group" style="margin-top: 0.5rem;">
           <label class="form-label" data-i18n="customerAddress">Address</label>
-          <input type="text" id="customerAddressInput" class="form-control" placeholder="e.g. Pitalapur, Solapur" style="margin-bottom: 8px;">
+          <input type="text" id="customerAddressInput" class="form-control" placeholder="e.g. SOLAPUR - Maharashtra" style="margin-bottom: 8px;">
           
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button type="button" id="voiceMicBtnEn" class="btn btn-sm btn-outline-primary" onclick="window.voiceManager.startVoiceInput('en-IN', 'customerAddressInput', 'voiceMicBtnEn')" title="Speak address in English">
@@ -155,13 +173,8 @@
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr>
-                <th style="width: 14%;" data-i18n="colTilesNo">Tiles No.</th>
-                <th style="width: 44%;" data-i18n="colParticulars">Particulars</th>
-                <th style="width: 12%;" data-i18n="colBoxes">Boxes</th>
-                <th style="width: 12%;" data-i18n="colRate">Rate (₹)</th>
-                <th style="width: 12%;" data-i18n="colAmount">Amount (₹)</th>
-                <th style="width: 6%;" data-i18n="colAction">Action</th>
+              <tr id="billTableHeaderRow">
+                <!-- Rendered dynamically by billing.js depending on Estimate vs GST Mode -->
               </tr>
             </thead>
             <tbody id="billLineItemsBody">
@@ -172,11 +185,24 @@
 
         <!-- Bill Totals & Khata Calculations Box -->
         <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
-          <div style="width: 100%; max-width: 380px; background-color: var(--bg-main); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <div style="width: 100%; max-width: 420px; background-color: var(--bg-main); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
             
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-              <span data-i18n="subtotal">Subtotal:</span>
+              <span id="subtotalLabelText" data-i18n="subtotal">Taxable Value / Subtotal:</span>
               <strong id="calcSubtotal">₹0</strong>
+            </div>
+
+            <!-- GST Specific Tax Rows -->
+            <div id="gstTaxCalculationRows" class="gst-field-only" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem; background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+                <span>Add : CGST @ <input type="number" id="cgstPercentInput" class="form-control" style="width: 60px; display: inline-block; padding: 2px 4px; text-align: center;" value="9" min="0" step="0.5" oninput="window.billingManager.calculateTotals()"> %:</span>
+                <strong id="calcCgstAmount" style="color: var(--accent-blue);">₹0</strong>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem; background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+                <span>Add : SGST @ <input type="number" id="sgstPercentInput" class="form-control" style="width: 60px; display: inline-block; padding: 2px 4px; text-align: center;" value="9" min="0" step="0.5" oninput="window.billingManager.calculateTotals()"> %:</span>
+                <strong id="calcSgstAmount" style="color: var(--accent-blue);">₹0</strong>
+              </div>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
@@ -186,7 +212,7 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
               <span data-i18n="roundOff">Round Off:</span>
-              <input type="number" id="roundOffInput" class="form-control" style="width: 110px; text-align: right; padding: 2px 6px;" value="0" oninput="window.billingManager.calculateTotals()">
+              <input type="number" id="roundOffInput" class="form-control" style="width: 110px; text-align: right; padding: 2px 6px;" value="0" step="0.01" oninput="window.billingManager.calculateTotals()">
             </div>
 
             <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 2px solid var(--accent-blue); font-size: 1.1rem; color: var(--accent-blue);">
