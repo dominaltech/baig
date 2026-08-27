@@ -134,7 +134,8 @@
                    placeholder="Type customer name to search..." 
                    autocomplete="off"
                    oninput="window.billingManager.onCustomerNameInput(this.value)" 
-                   onfocus="window.billingManager.onCustomerNameInput(this.value)">
+                   onfocus="window.billingManager.onCustomerNameInput(this.value)"
+                   onblur="window.billingManager.onCustomerBlur()">
             <div id="customerAutocompleteList" class="autocomplete-dropdown" style="display: none;"></div>
           </div>
 
@@ -178,7 +179,7 @@
           <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.addLineItem()" data-i18n="addItem">+ Add New Item</button>
         </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive billing-table-responsive">
           <table class="data-table">
             <thead>
               <tr id="billTableHeaderRow">

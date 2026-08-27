@@ -4,7 +4,7 @@
   Falls back to Cache for 100% Offline Access.
 */
 
-const CACHE_NAME = 'baig-tiles-crm-v2.5';
+const CACHE_NAME = 'baig-tiles-crm-v2.6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

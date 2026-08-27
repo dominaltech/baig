@@ -162,26 +162,20 @@ class BillingManager {
     if (!listEl) return;
 
     const q = (value || '').trim().toLowerCase();
-    const sortedCustomers = [...this.customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-    let matches = [];
     if (!q) {
-      matches = sortedCustomers.slice(0, 8);
-    } else {
-      matches = sortedCustomers.filter(c => 
-        (c.name && c.name.toLowerCase().includes(q)) || 
-        (c.phone && c.phone.toLowerCase().includes(q)) ||
-        (c.address && c.address.toLowerCase().includes(q))
-      ).slice(0, 10);
+      listEl.style.display = 'none';
+      return;
     }
 
+    const sortedCustomers = [...this.customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const matches = sortedCustomers.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) || 
+      (c.phone && c.phone.toLowerCase().includes(q)) ||
+      (c.address && c.address.toLowerCase().includes(q))
+    ).slice(0, 8);
+
     if (matches.length === 0) {
-      listEl.innerHTML = `
-        <div class="autocomplete-item" style="color: var(--text-muted); cursor: default;">
-          <span>No existing customer found. Enter details manually.</span>
-        </div>
-      `;
-      listEl.style.display = 'block';
+      listEl.style.display = 'none';
       return;
     }
 
@@ -196,6 +190,13 @@ class BillingManager {
     `).join('');
 
     listEl.style.display = 'block';
+  }
+
+  onCustomerBlur() {
+    setTimeout(() => {
+      const listEl = document.getElementById('customerAutocompleteList');
+      if (listEl) listEl.style.display = 'none';
+    }, 200);
   }
 
   selectCustomerSuggestion(customerId) {
@@ -338,10 +339,13 @@ class BillingManager {
     setTimeout(() => {
       const listEl = document.getElementById(`productAutocompleteList-${index}`);
       if (listEl) listEl.style.display = 'none';
-    }, 250);
+    }, 200);
   }
 
   selectProductSuggestion(index, productId) {
+    const listEl = document.getElementById(`productAutocompleteList-${index}`);
+    if (listEl) listEl.style.display = 'none';
+
     const prod = this.products.find(p => p.id === parseInt(productId, 10));
     if (!prod) return;
 
@@ -374,6 +378,9 @@ class BillingManager {
   }
 
   selectCustomProductEntry(index, customName) {
+    const listEl = document.getElementById(`productAutocompleteList-${index}`);
+    if (listEl) listEl.style.display = 'none';
+
     this.lineItems[index].isCustom = true;
     this.lineItems[index].particulars = customName;
     if (!this.lineItems[index].boxes || this.lineItems[index].boxes === 0) {
