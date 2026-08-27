@@ -221,7 +221,7 @@ class AppRouter {
           </td>
           <td>
             <strong>${dateDisplay}</strong>
-            ${timeDisplay ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;">🕒 ${timeDisplay}</small>` : ''}
+            ${timeDisplay ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;"><svg class="svg-icon" style="width: 12px; height: 12px; vertical-align: -1px; margin-right: 2px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeDisplay}</small>` : ''}
           </td>
           <td>${(b.items || []).length} items</td>
           <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
@@ -233,14 +233,17 @@ class AppRouter {
           <td>
             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
               <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.viewBillPreview(${b.id})" title="View Preview & Print">
-                👁️ View
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <span>View</span>
               </button>
               <button class="btn btn-sm btn-secondary" onclick="window.billingManager.editBill(${b.id})" title="Edit this Bill">
-                ✏️ Edit
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                <span>Edit</span>
               </button>
               ${b.status === 'finalized' ? `
                 <button class="btn btn-sm btn-outline-danger" onclick="window.billingManager.openReturnModal(${b.id})" title="Return / Exchange items from this bill">
-                  🔄 Return
+                  <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                  <span>Return</span>
                 </button>
               ` : ''}
             </div>
@@ -271,7 +274,7 @@ class AppRouter {
     tableBody.innerHTML = returns.map(r => {
       const dt = new Date(r.date);
       const dateStr = !isNaN(dt.getTime())
-        ? `${dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} <br><small style="color: var(--text-muted);">🕒 ${dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</small>`
+        ? `${dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} <br><small style="color: var(--text-muted);"><svg class="svg-icon" style="width: 12px; height: 12px; vertical-align: -1px; margin-right: 2px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</small>`
         : (r.date || '');
 
       const itemsSummary = (r.items || []).map(i => `• <strong>${i.particulars}</strong> (${i.returnBoxes} boxes @ ₹${i.rate})`).join('<br>');

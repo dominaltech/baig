@@ -351,13 +351,14 @@ body {
   background-color: #15803d;
 }
 
-.btn-danger {
-  background-color: var(--danger);
-  color: #ffffff;
+.btn-outline-danger {
+  background-color: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
-.btn-danger:hover {
-  background-color: #b91c1c;
+.btn-outline-danger:hover {
+  background-color: #fee2e2;
 }
 
 .btn-icon-only {
@@ -373,6 +374,61 @@ body {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.btn-sm .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Content Section Segmented Tabs (Bills History & Returns) */
+.content-tabs-toggle {
+  display: inline-flex;
+  background-color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.content-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #334155;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.content-tab-btn:hover {
+  color: var(--accent-blue);
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.content-tab-btn.active {
+  background-color: var(--accent-blue);
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(10, 37, 64, 0.25);
+}
+
+.content-tab-btn.active svg {
+  stroke: #ffffff !important;
+}
+
+.content-tab-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
 }
 
 /* Cards & Grid Containers */
@@ -1133,54 +1189,132 @@ body {
   font-weight: 800;
 }
 
-/* Strict Print Stylesheet with Page Margins */
+/* ==========================================================================
+   STRICT 1-PAGE HIGH-PRECISION PRINT STYLESHEET
+   ========================================================================== */
+
 @page {
-  margin: 10mm 12mm;
-  size: auto;
+  size: A4 portrait;
+  margin: 5mm 8mm;
 }
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  
-  .bill-estimate-container,
-  .bill-estimate-container *,
-  .bill-gst-container,
-  .bill-gst-container * {
-    visibility: visible;
+  /* Force exact background colors and graphics printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-sizing: border-box !important;
   }
 
-  .bill-estimate-container,
-  .bill-gst-container {
-    position: absolute;
-    left: 0;
-    top: 0;
+  html, body {
     margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Hide entire application shell and irrelevant modals from document layout */
+  .app-header,
+  .app-nav,
+  .app-content,
+  .dominal-corner-tag,
+  .modal-backdrop:not(#billPreviewModal),
+  .modal-header,
+  .modal-footer {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Display ONLY the bill preview modal container */
+  #billPreviewModal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
+  }
+
+  #billPreviewModal .modal-container {
+    display: block !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
-    border: 1.5px solid #742220 !important;
-    box-shadow: none !important;
-  }
-
-  .modal-backdrop {
-    position: static !important;
-    background: none !important;
-    padding: 0 !important;
-  }
-
-  .modal-container {
-    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
   }
 
-  .modal-header,
-  .modal-footer,
-  .dominal-corner-tag,
-  .app-header,
-  .app-nav {
-    display: none !important;
+  #billPreviewModal .modal-body {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  #printableBillEstimateModalContent {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Bill Layout Containers - Guaranteed Single Page */
+  .bill-gst-container,
+  .bill-estimate-container {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .bill-gst-container {
+    border: 1.5px solid #742220 !important;
+  }
+
+  .bill-estimate-container {
+    border: 1.5px solid #cbd5e1 !important;
+  }
+
+  .bill-gst-table,
+  .bill-estimate-table {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .bill-gst-table td,
+  .bill-estimate-table td {
+    height: 24px !important;
+    padding: 3px 6px !important;
   }
 }
 

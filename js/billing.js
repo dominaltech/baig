@@ -193,7 +193,7 @@ class BillingManager {
             <select class="form-control" style="font-weight: 600;" onchange="window.billingManager.onProductSelectChange(${idx}, this.value)">
               <option value="">${window.i18n.t('selectProduct')}</option>
               <option value="__CUSTOM__" ${item.isCustom ? 'selected' : ''} style="font-weight: 800; color: #0a2540; background-color: #eff6ff;">
-                ⚡ + Add New Custom Product
+                + Add New Custom Product...
               </option>
               ${this.products.map(p => `
                 <option value="${p.id}" ${!item.isCustom && p.name.toLowerCase() === (item.particulars || '').toLowerCase() ? 'selected' : ''}>
