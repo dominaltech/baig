@@ -156,8 +156,49 @@ class BillingManager {
       this.customers.map(c => `<option value="${c.id}">${c.name} (${c.phone || 'No Phone'})</option>`).join('');
   }
 
-  onCustomerSelectChange(customerId) {
-    if (!customerId) return;
+  // --- CUSTOMER AUTOCOMPLETE SEARCH ---
+  onCustomerNameInput(value) {
+    const listEl = document.getElementById('customerAutocompleteList');
+    if (!listEl) return;
+
+    const q = (value || '').trim().toLowerCase();
+    const sortedCustomers = [...this.customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    let matches = [];
+    if (!q) {
+      matches = sortedCustomers.slice(0, 8);
+    } else {
+      matches = sortedCustomers.filter(c => 
+        (c.name && c.name.toLowerCase().includes(q)) || 
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q))
+      ).slice(0, 10);
+    }
+
+    if (matches.length === 0) {
+      listEl.innerHTML = `
+        <div class="autocomplete-item" style="color: var(--text-muted); cursor: default;">
+          <span>No existing customer found. Enter details manually.</span>
+        </div>
+      `;
+      listEl.style.display = 'block';
+      return;
+    }
+
+    listEl.innerHTML = matches.map(c => `
+      <div class="autocomplete-item" onmousedown="window.billingManager.selectCustomerSuggestion(${c.id})">
+        <div>
+          <div class="autocomplete-item-title">${c.name}</div>
+          <div class="autocomplete-item-sub"><svg class="svg-icon" style="width:11px;height:11px;vertical-align:-1px;margin-right:2px;" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${c.phone || 'No Phone'} • 📍 ${c.address || 'Solapur'}</div>
+        </div>
+        ${c.gstin ? `<span class="autocomplete-item-badge">GST: ${c.gstin}</span>` : ''}
+      </div>
+    `).join('');
+
+    listEl.style.display = 'block';
+  }
+
+  selectCustomerSuggestion(customerId) {
     const c = this.customers.find(item => item.id === parseInt(customerId, 10));
     if (!c) return;
 
@@ -166,15 +207,26 @@ class BillingManager {
     document.getElementById('customerAddressInput').value = c.address || '';
     const gstinEl = document.getElementById('customerGstinInput');
     if (gstinEl) gstinEl.value = c.gstin || '';
+    const custSelect = document.getElementById('customerSelect');
+    if (custSelect) custSelect.value = c.id;
 
     // Auto-lookup previous outstanding dues for this customer across past bills
     const custBills = this.bills.filter(b => b.customerId === c.id || b.customerPhone === c.phone);
     const totalDues = custBills.reduce((sum, b) => sum + (b.balanceDue || 0), 0);
     document.getElementById('previousDuesInput').value = totalDues;
 
+    const listEl = document.getElementById('customerAutocompleteList');
+    if (listEl) listEl.style.display = 'none';
+
     this.calculateTotals();
   }
 
+  onCustomerSelectChange(customerId) {
+    if (!customerId) return;
+    this.selectCustomerSuggestion(customerId);
+  }
+
+  // --- LINE ITEMS TABLE WITH TYPE-AHEAD SEARCH AUTOCOMPLETE ---
   renderLineItemsTable() {
     const container = document.getElementById('billLineItemsBody');
     if (!container) return;
@@ -185,38 +237,20 @@ class BillingManager {
       <tr>
         <td>
           <input type="text" class="form-control" value="${item.tilesNo || ''}" 
-                 placeholder="e.g. 800 x 600 mm"
+                 placeholder="e.g. 2x4 / 800x600"
                  oninput="window.billingManager.updateLineItem(${idx}, 'tilesNo', this.value)">
         </td>
-        <td>
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <select class="form-control" style="font-weight: 600;" onchange="window.billingManager.onProductSelectChange(${idx}, this.value)">
-              <option value="">${window.i18n.t('selectProduct')}</option>
-              <option value="__CUSTOM__" ${item.isCustom ? 'selected' : ''} style="font-weight: 800; color: #0a2540; background-color: #eff6ff;">
-                + Add New Custom Product...
-              </option>
-              ${this.products.map(p => `
-                <option value="${p.id}" ${!item.isCustom && p.name.toLowerCase() === (item.particulars || '').toLowerCase() ? 'selected' : ''}>
-                  ${p.name} [${p.size || 'N/A'}] - ₹${p.rate}/box (Stock: ${p.stock})
-                </option>
-              `).join('')}
-            </select>
-            
-            ${item.isCustom ? `
-              <div style="display: flex; gap: 4px; margin-top: 4px;">
-                <input type="text" id="line-custom-${idx}" class="form-control" 
-                       style="border-color: var(--accent-blue);" 
-                       value="${item.particulars || ''}" 
-                       placeholder="Enter product name..."
-                       oninput="window.billingManager.updateLineItem(${idx}, 'particulars', this.value)"
-                       onkeydown="if(event.key === 'Enter'){ event.preventDefault(); window.billingManager.saveCustomProductToStock(${idx}); }">
-                <button type="button" class="btn btn-sm btn-success" 
-                        onclick="window.billingManager.saveCustomProductToStock(${idx})" 
-                        title="Save as new product to inventory stock">
-                  Save to Stock
-                </button>
-              </div>
-            ` : ''}
+        <td style="position: relative;">
+          <div style="position: relative;">
+            <input type="text" id="line-particulars-${idx}" class="form-control" 
+                   style="font-weight: 600;" 
+                   value="${item.particulars || ''}" 
+                   placeholder="Type product name or size..." 
+                   autocomplete="off"
+                   oninput="window.billingManager.onProductInput(${idx}, this.value)"
+                   onfocus="window.billingManager.onProductInput(${idx}, this.value)"
+                   onblur="window.billingManager.onProductBlur(${idx})">
+            <div id="productAutocompleteList-${idx}" class="autocomplete-dropdown" style="display: none;"></div>
           </div>
         </td>
 
@@ -242,12 +276,124 @@ class BillingManager {
           <strong id="line-amount-${idx}" style="color: var(--accent-blue);">₹${(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
         </td>
         <td>
-          <button class="btn btn-sm btn-danger" onclick="window.billingManager.removeLineItem(${idx})">
+          <button class="btn btn-sm btn-danger" onclick="window.billingManager.removeLineItem(${idx})" title="Remove item">
             <svg class="svg-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </td>
       </tr>
     `).join('');
+  }
+
+  onProductInput(index, query) {
+    const listEl = document.getElementById(`productAutocompleteList-${index}`);
+    if (!listEl) return;
+
+    const q = (query || '').trim().toLowerCase();
+    const sortedProducts = [...this.products].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    let matches = [];
+    if (!q) {
+      matches = sortedProducts.slice(0, 10);
+    } else {
+      matches = sortedProducts.filter(p => 
+        (p.name && p.name.toLowerCase().includes(q)) || 
+        (p.size && p.size.toLowerCase().includes(q)) ||
+        (p.hsnCode && p.hsnCode.toLowerCase().includes(q))
+      ).slice(0, 12);
+    }
+
+    let html = '';
+    if (matches.length > 0) {
+      html += matches.map(p => `
+        <div class="autocomplete-item" onmousedown="window.billingManager.selectProductSuggestion(${index}, ${p.id})">
+          <div>
+            <div class="autocomplete-item-title">${p.name} <span class="autocomplete-item-badge" style="margin-left: 6px;">${p.size || 'N/A'}</span></div>
+            <div class="autocomplete-item-sub">Rate: <strong>₹${p.rate}</strong> • Stock: <span style="color: ${p.stock > 10 ? 'var(--success)' : 'var(--danger)'}; font-weight: 700;">${p.stock} boxes</span></div>
+          </div>
+          <span style="font-weight: 800; color: var(--accent-blue);">₹${p.rate}</span>
+        </div>
+      `).join('');
+    }
+
+    // Allow custom product entry option
+    if (q) {
+      html += `
+        <div class="autocomplete-item" style="background-color: #f8fafc; border-top: 1px dashed #cbd5e1;" onmousedown="window.billingManager.selectCustomProductEntry(${index}, '${q.replace(/'/g, "\\'")}')">
+          <div style="font-weight: 700; color: var(--accent-blue);">
+            + Use as custom item: "${query}"
+          </div>
+          <span class="autocomplete-item-badge">Custom</span>
+        </div>
+      `;
+    }
+
+    listEl.innerHTML = html;
+    listEl.style.display = 'block';
+
+    // Update item particulars directly if typing custom
+    this.lineItems[index].particulars = query;
+  }
+
+  onProductBlur(index) {
+    setTimeout(() => {
+      const listEl = document.getElementById(`productAutocompleteList-${index}`);
+      if (listEl) listEl.style.display = 'none';
+    }, 250);
+  }
+
+  selectProductSuggestion(index, productId) {
+    const prod = this.products.find(p => p.id === parseInt(productId, 10));
+    if (!prod) return;
+
+    this.lineItems[index].isCustom = false;
+    this.lineItems[index].particulars = prod.name;
+    this.lineItems[index].tilesNo = prod.size || '2x4';
+    this.lineItems[index].hsnCode = prod.hsnCode || '6907';
+    this.lineItems[index].rate = prod.rate;
+    if (!this.lineItems[index].boxes || this.lineItems[index].boxes === 0) {
+      this.lineItems[index].boxes = 1;
+    }
+    this.lineItems[index].amount = this.lineItems[index].boxes * prod.rate;
+
+    // Auto-add new line item row if selecting on the last row
+    if (index === this.lineItems.length - 1) {
+      this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+    }
+
+    this.renderLineItemsTable();
+    this.calculateTotals();
+
+    // Focus the boxes input of the selected item for ultra-fast data entry
+    setTimeout(() => {
+      const boxInput = document.getElementById(`line-boxes-${index}`);
+      if (boxInput) {
+        boxInput.focus();
+        boxInput.select();
+      }
+    }, 60);
+  }
+
+  selectCustomProductEntry(index, customName) {
+    this.lineItems[index].isCustom = true;
+    this.lineItems[index].particulars = customName;
+    if (!this.lineItems[index].boxes || this.lineItems[index].boxes === 0) {
+      this.lineItems[index].boxes = 1;
+    }
+
+    if (index === this.lineItems.length - 1) {
+      this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+    }
+
+    this.renderLineItemsTable();
+    this.calculateTotals();
+
+    setTimeout(() => {
+      const rateInput = document.getElementById(`line-rate-${index}`);
+      if (rateInput) {
+        rateInput.focus();
+        rateInput.select();
+      }
+    }, 60);
   }
 
   addLineItem() {
@@ -258,84 +404,9 @@ class BillingManager {
 
   removeLineItem(index) {
     this.lineItems.splice(index, 1);
-    this.renderLineItemsTable();
-    this.calculateTotals();
-  }
-
-  onProductSelectChange(index, value) {
-    if (value === '__CUSTOM__') {
-      this.lineItems[index].isCustom = true;
-      this.lineItems[index].particulars = '';
-      this.lineItems[index].rate = 0;
-      this.lineItems[index].amount = 0;
-    } else if (value) {
-      const prod = this.products.find(p => p.id === parseInt(value, 10));
-      if (prod) {
-        this.lineItems[index].isCustom = false;
-        this.lineItems[index].particulars = prod.name;
-        this.lineItems[index].tilesNo = prod.size || '2x4';
-        this.lineItems[index].hsnCode = prod.hsnCode || '6907';
-        this.lineItems[index].rate = prod.rate;
-        if (!this.lineItems[index].boxes) {
-          this.lineItems[index].boxes = 1;
-        }
-        this.lineItems[index].amount = (this.lineItems[index].boxes || 0) * prod.rate;
-
-        // Auto-add new row if product is selected on the last row
-        if (index === this.lineItems.length - 1) {
-          this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
-        }
-      }
-    } else {
-      this.lineItems[index].isCustom = false;
-      this.lineItems[index].particulars = '';
-      this.lineItems[index].rate = 0;
-      this.lineItems[index].amount = 0;
-    }
-
-    this.renderLineItemsTable();
-    this.calculateTotals();
-  }
-
-  async saveCustomProductToStock(index) {
-    const item = this.lineItems[index];
-    if (!item) return;
-
-    const name = (item.particulars || '').trim();
-    const rate = parseFloat(item.rate) || 0;
-
-    if (!name) {
-      alert('Please enter a product name for the new custom product.');
-      return;
-    }
-
-    if (rate <= 0) {
-      alert('Price / Rate setting is compulsory! Please enter a valid rate (₹) for the new product.');
-      return;
-    }
-
-    const newProduct = {
-      name: name,
-      size: item.tilesNo || '2x4',
-      hsnCode: item.hsnCode || '6907',
-      rate: rate,
-      stock: 100,
-      minStockAlert: 10
-    };
-
-    await window.dbManager.saveProduct(newProduct);
-    this.products = await window.dbManager.getProducts();
-
-    item.isCustom = false;
-    item.particulars = name;
-
-    // Auto-add new row if custom product saved on last row
-    if (index === this.lineItems.length - 1) {
+    if (this.lineItems.length === 0) {
       this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
     }
-
-    alert(`✓ Product "${name}" saved to Inventory Stock successfully!`);
-    
     this.renderLineItemsTable();
     this.calculateTotals();
   }
@@ -1127,3 +1198,16 @@ class BillingManager {
 }
 
 window.billingManager = new BillingManager();
+
+// Global click and keydown listener to close autocomplete dropdowns
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.form-group') && !e.target.closest('td') && !e.target.closest('.autocomplete-dropdown')) {
+    document.querySelectorAll('.autocomplete-dropdown').forEach(el => el.style.display = 'none');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.autocomplete-dropdown').forEach(el => el.style.display = 'none');
+  }
+});
