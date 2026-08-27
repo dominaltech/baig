@@ -5,7 +5,7 @@
 */
 
 const DB_NAME = 'BaigTilesDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class DatabaseManager {
   constructor() {
@@ -52,6 +52,14 @@ class DatabaseManager {
           billStore.createIndex('customerId', 'customerId', { unique: false });
           billStore.createIndex('status', 'status', { unique: false });
           billStore.createIndex('date', 'date', { unique: false });
+        }
+
+        // Returns & Exchanges Store
+        if (!db.objectStoreNames.contains('returns')) {
+          const retStore = db.createObjectStore('returns', { keyPath: 'id', autoIncrement: true });
+          retStore.createIndex('billId', 'billId', { unique: false });
+          retStore.createIndex('customerName', 'customerName', { unique: false });
+          retStore.createIndex('date', 'date', { unique: false });
         }
 
         // Settings Store
@@ -221,7 +229,7 @@ class DatabaseManager {
 
     const seedSettings = [
       { key: 'appLanguage', value: 'en' },
-      { key: 'userRole', value: 'owner' },
+      { key: 'userRole', value: 'staff' },
       { key: 'lastBillNo', value: 941 }
     ];
 
@@ -393,6 +401,37 @@ class DatabaseManager {
     return true;
   }
 
+  // --- RETURNS & EXCHANGES DATA ACCESS API ---
+  async getReturns() {
+    await this.init();
+    return new Promise((resolve) => {
+      const tx = this.db.transaction('returns', 'readonly');
+      const store = tx.objectStore('returns');
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+    });
+  }
+
+  async saveReturn(returnRecord) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('returns', 'readwrite');
+      const store = tx.objectStore('returns');
+      const req = store.put(returnRecord);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async restockProduct(productName, quantity) {
+    const products = await this.getProducts();
+    const prod = products.find(p => p.name.toLowerCase() === productName.toLowerCase());
+    if (prod) {
+      prod.stock = (prod.stock || 0) + parseInt(quantity || 0, 10);
+      await this.saveProduct(prod);
+    }
+  }
+
   // --- SETTINGS API ---
   async getSetting(key) {
     await this.init();
@@ -417,10 +456,13 @@ class DatabaseManager {
   // --- DATA RESET & EXPORT ---
   async clearAllData() {
     await this.init();
-    const tx = this.db.transaction(['products', 'customers', 'bills', 'settings'], 'readwrite');
+    const tx = this.db.transaction(['products', 'customers', 'bills', 'returns', 'settings'], 'readwrite');
     tx.objectStore('products').clear();
     tx.objectStore('customers').clear();
     tx.objectStore('bills').clear();
+    if (tx.objectStoreNames && tx.objectStoreNames.contains('returns')) {
+      tx.objectStore('returns').clear();
+    }
     tx.objectStore('settings').clear();
 
     return new Promise((resolve) => {
@@ -434,3 +476,4 @@ class DatabaseManager {
 
 // Global DB Singleton Instance
 window.dbManager = new DatabaseManager();
+

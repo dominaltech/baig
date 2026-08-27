@@ -42,7 +42,7 @@ function numberToWords(num) {
 class BillingManager {
   constructor() {
     this.currentBillId = null;
-    this.billType = 'gst'; // Default to GST mode
+    this.billType = 'estimate'; // Default to Estimate mode
     this.lineItems = [];
     this.products = [];
     this.customers = [];
@@ -280,6 +280,11 @@ class BillingManager {
           this.lineItems[index].boxes = 1;
         }
         this.lineItems[index].amount = (this.lineItems[index].boxes || 0) * prod.rate;
+
+        // Auto-add new row if product is selected on the last row
+        if (index === this.lineItems.length - 1) {
+          this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+        }
       }
     } else {
       this.lineItems[index].isCustom = false;
@@ -323,6 +328,11 @@ class BillingManager {
 
     item.isCustom = false;
     item.particulars = name;
+
+    // Auto-add new row if custom product saved on last row
+    if (index === this.lineItems.length - 1) {
+      this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+    }
 
     alert(`✓ Product "${name}" saved to Inventory Stock successfully!`);
     
@@ -850,6 +860,210 @@ class BillingManager {
         </table>
       </div>
     `;
+  }
+
+  // --- EDIT EXISTING BILL FROM HISTORY ---
+  async editBill(billId) {
+    const bill = await window.dbManager.getBillById(parseInt(billId, 10));
+    if (!bill) {
+      alert('Bill not found!');
+      return;
+    }
+
+    this.currentBillId = bill.id;
+    await window.appRouter.switchView('billing');
+
+    const titleEl = document.getElementById('billingFormTitle');
+    if (titleEl) titleEl.textContent = `Edit Bill (No. ${bill.billNo || bill.id})`;
+
+    document.getElementById('customerNameInput').value = bill.customerName || '';
+    document.getElementById('customerPhoneInput').value = bill.customerPhone || '';
+    document.getElementById('customerAddressInput').value = bill.customerAddress || '';
+    const gstinEl = document.getElementById('customerGstinInput');
+    if (gstinEl) gstinEl.value = bill.customerGstin || '';
+
+    document.getElementById('billDateInput').value = bill.date || new Date().toISOString().split('T')[0];
+    document.getElementById('billNumberDisplay').textContent = `No. ${bill.billNo || bill.id}`;
+
+    document.getElementById('previousDuesInput').value = bill.previousDues || 0;
+    document.getElementById('roundOffInput').value = bill.roundOff || 0;
+    document.getElementById('advancePaidInput').value = bill.paidAmount || 0;
+
+    const cgstIn = document.getElementById('cgstPercentInput');
+    const sgstIn = document.getElementById('sgstPercentInput');
+    if (cgstIn) cgstIn.value = bill.cgstPercent !== undefined ? bill.cgstPercent : 9;
+    if (sgstIn) sgstIn.value = bill.sgstPercent !== undefined ? bill.sgstPercent : 9;
+
+    this.lineItems = bill.items && bill.items.length > 0
+      ? JSON.parse(JSON.stringify(bill.items))
+      : [{ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 }];
+
+    // Auto-append empty row at the end if last item has particulars
+    if (this.lineItems.length > 0 && this.lineItems[this.lineItems.length - 1].particulars) {
+      this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+    }
+
+    this.setBillType(bill.billType || 'estimate');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // --- RETURNS & EXCHANGES MANAGEMENT (माल परतावा) ---
+  async openReturnModal(billId = null) {
+    const bills = await window.dbManager.getBills();
+    const finalizedBills = bills.filter(b => b.status === 'finalized');
+
+    const selectEl = document.getElementById('returnBillSelect');
+    if (!selectEl) return;
+
+    selectEl.innerHTML = '<option value="">-- Select Bill to Return / Exchange Items --</option>' +
+      finalizedBills.map(b => `<option value="${b.id}">No. ${b.billNo || b.id} - ${b.customerName} (₹${(b.total || 0).toLocaleString('en-IN')})</option>`).join('');
+
+    // Reset return UI
+    document.getElementById('returnBillDetailsCard').style.display = 'none';
+    document.getElementById('returnItemsSection').style.display = 'none';
+    document.getElementById('btnSubmitReturn').disabled = true;
+    document.getElementById('returnTotalRefundDisplay').value = '₹0';
+    this.currentReturnBill = null;
+    this.currentReturnItems = [];
+
+    if (billId) {
+      selectEl.value = billId;
+      await this.onReturnBillSelectChange(billId);
+    }
+
+    window.appRouter.openModal('returnItemModal');
+  }
+
+  async onReturnBillSelectChange(billId) {
+    if (!billId) {
+      document.getElementById('returnBillDetailsCard').style.display = 'none';
+      document.getElementById('returnItemsSection').style.display = 'none';
+      document.getElementById('btnSubmitReturn').disabled = true;
+      this.currentReturnBill = null;
+      return;
+    }
+
+    const bill = await window.dbManager.getBillById(parseInt(billId, 10));
+    if (!bill) return;
+
+    this.currentReturnBill = bill;
+
+    document.getElementById('retCustomerName').innerHTML = `<strong>Customer:</strong> ${bill.customerName} (${bill.customerPhone || 'No Phone'})`;
+    document.getElementById('retBillDate').innerHTML = `<strong>Invoice Date:</strong> ${bill.date}`;
+    document.getElementById('retBillTotal').textContent = `₹${(bill.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    document.getElementById('retBillBalance').textContent = `₹${(bill.balanceDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    document.getElementById('returnBillDetailsCard').style.display = 'block';
+    document.getElementById('returnItemsSection').style.display = 'block';
+
+    const tableBody = document.getElementById('returnItemsTableBody');
+    this.currentReturnItems = (bill.items || []).map(item => ({
+      particulars: item.particulars || item.tilesNo || 'Item',
+      soldBoxes: parseInt(item.boxes || 0, 10),
+      rate: parseFloat(item.rate || 0),
+      returnBoxes: 0,
+      refundAmount: 0
+    }));
+
+    tableBody.innerHTML = this.currentReturnItems.map((item, idx) => `
+      <tr>
+        <td><strong>${item.particulars}</strong></td>
+        <td style="text-align: center;">${item.soldBoxes} Boxes</td>
+        <td style="text-align: right;">₹${item.rate.toFixed(2)}</td>
+        <td>
+          <input type="number" class="form-control" style="width: 90px; text-align: center;" 
+                 min="0" max="${item.soldBoxes}" value="0" 
+                 oninput="window.billingManager.updateReturnRow(${idx}, this.value)">
+        </td>
+        <td style="text-align: right;">
+          <strong id="ret-row-amt-${idx}" style="color: var(--accent-blue);">₹0.00</strong>
+        </td>
+      </tr>
+    `).join('');
+
+    this.updateReturnRefundTotal();
+  }
+
+  updateReturnRow(index, value) {
+    const item = this.currentReturnItems[index];
+    if (!item) return;
+
+    let boxes = parseInt(value, 10) || 0;
+    if (boxes < 0) boxes = 0;
+    if (boxes > item.soldBoxes) {
+      boxes = item.soldBoxes;
+      alert(`Cannot return more than the sold quantity (${item.soldBoxes} boxes).`);
+    }
+
+    item.returnBoxes = boxes;
+    item.refundAmount = boxes * item.rate;
+
+    const rowAmtEl = document.getElementById(`ret-row-amt-${index}`);
+    if (rowAmtEl) {
+      rowAmtEl.textContent = `₹${item.refundAmount.toFixed(2)}`;
+    }
+
+    this.updateReturnRefundTotal();
+  }
+
+  updateReturnRefundTotal() {
+    const totalRefund = this.currentReturnItems.reduce((sum, i) => sum + (i.refundAmount || 0), 0);
+    const totalBoxes = this.currentReturnItems.reduce((sum, i) => sum + (i.returnBoxes || 0), 0);
+
+    const displayEl = document.getElementById('returnTotalRefundDisplay');
+    if (displayEl) {
+      displayEl.value = `₹${totalRefund.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    const submitBtn = document.getElementById('btnSubmitReturn');
+    if (submitBtn) {
+      submitBtn.disabled = totalBoxes <= 0;
+    }
+  }
+
+  async submitReturn() {
+    if (!this.currentReturnBill) return;
+
+    const returnedItems = this.currentReturnItems.filter(i => i.returnBoxes > 0);
+    if (returnedItems.length === 0) {
+      alert('Please specify at least one item and quantity to return.');
+      return;
+    }
+
+    const totalRefund = returnedItems.reduce((sum, i) => sum + i.refundAmount, 0);
+    const reason = document.getElementById('returnReasonSelect').value;
+
+    // 1. Restock products into Inventory
+    for (const item of returnedItems) {
+      await window.dbManager.restockProduct(item.particulars, item.returnBoxes);
+    }
+
+    // 2. Log Return Record
+    const returnRecord = {
+      billId: this.currentReturnBill.id,
+      billNo: this.currentReturnBill.billNo,
+      customerName: this.currentReturnBill.customerName,
+      customerPhone: this.currentReturnBill.customerPhone,
+      date: new Date().toISOString(),
+      items: returnedItems,
+      totalRefundAmount: totalRefund,
+      reason: reason
+    };
+    await window.dbManager.saveReturn(returnRecord);
+
+    // 3. Adjust Customer Bill Total & Khata Balance
+    this.currentReturnBill.balanceDue = Math.max(0, (this.currentReturnBill.balanceDue || 0) - totalRefund);
+    this.currentReturnBill.total = Math.max(0, (this.currentReturnBill.total || 0) - totalRefund);
+    await window.dbManager.saveBill(this.currentReturnBill);
+
+    window.appRouter.closeModal('returnItemModal');
+    alert(`✓ Return processed successfully!\n• Restocked into Inventory: ${returnedItems.map(i => `${i.returnBoxes} boxes of ${i.particulars}`).join(', ')}\n• Khata / Dues adjusted: ₹${totalRefund.toLocaleString('en-IN')}`);
+
+    // Refresh UI
+    await window.appRouter.loadBillsList();
+    if (window.appRouter.currentView === 'inventory') {
+      await window.inventoryManager.loadInventory();
+    }
   }
 
   triggerPrint() {

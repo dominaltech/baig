@@ -41,7 +41,7 @@ const translations = {
     colRate: "Rate (₹)",
     colAmount: "Amount (Rs.)",
     colAction: "Actions",
-    addItem: "+ Add Line Item",
+    addItem: "+ Add New Item",
     selectProduct: "-- Select Product --",
     customProductOption: "+ Add Custom Product...",
     
@@ -137,7 +137,7 @@ const translations = {
     colRate: "दर (₹)",
     colAmount: "राशि (रु.)",
     colAction: "कार्रवाई",
-    addItem: "+ नई लाइन जोड़ें",
+    addItem: "+ नया आइटम जोड़ें",
     selectProduct: "-- उत्पाद चुनें --",
     customProductOption: "+ नया उत्पाद दर्ज करें...",
     
@@ -233,7 +233,7 @@ const translations = {
     colRate: "दर (₹)",
     colAmount: "रक्कम (रु.)",
     colAction: "कृती",
-    addItem: "+ नवीन रांग जोडा",
+    addItem: "+ नवीन आयटम जोडा",
     selectProduct: "-- माल निवडा --",
     customProductOption: "+ नवीन माल प्रविष्ट करा...",
     

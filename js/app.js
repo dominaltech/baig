@@ -9,7 +9,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 class AppRouter {
   constructor() {
     this.currentView = 'billing';
-    this.userRole = 'owner'; // 'owner' or 'staff'
+    this.userRole = 'staff'; // 'owner' or 'staff'
   }
 
   async init() {
@@ -19,10 +19,13 @@ class AppRouter {
     // 2. Init i18n Translation Engine
     await window.i18n.init();
 
-    // 3. Load Saved User Role
+    // 3. Load Saved User Role (Default to 'staff' if none set)
     const savedRole = await window.dbManager.getSetting('userRole');
     if (savedRole) {
       this.userRole = savedRole;
+    } else {
+      this.userRole = 'staff';
+      await window.dbManager.setSetting('userRole', 'staff');
     }
     this.applyRoleRestrictions();
 
@@ -153,13 +156,34 @@ class AppRouter {
     }
   }
 
-  // --- BILLS LIST VIEW ---
+  // --- BILLS LIST VIEW & RETURNS ---
+  switchBillsTab(tab) {
+    const allContainer = document.getElementById('allBillsListContainer');
+    const retContainer = document.getElementById('returnsListContainer');
+    const allBtn = document.getElementById('billsTabAllBtn');
+    const retBtn = document.getElementById('billsTabReturnsBtn');
+
+    if (tab === 'returns') {
+      if (allContainer) allContainer.style.display = 'none';
+      if (retContainer) retContainer.style.display = 'block';
+      if (allBtn) allBtn.classList.remove('active');
+      if (retBtn) retBtn.classList.add('active');
+      this.loadReturnsList();
+    } else {
+      if (allContainer) allContainer.style.display = 'block';
+      if (retContainer) retContainer.style.display = 'none';
+      if (allBtn) allBtn.classList.add('active');
+      if (retBtn) retBtn.classList.remove('active');
+      this.loadBillsList();
+    }
+  }
+
   async loadBillsList() {
     const tableBody = document.getElementById('billsListTableBody');
     if (!tableBody) return;
 
     const bills = await window.dbManager.getBills();
-    bills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    bills.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
 
     if (bills.length === 0) {
       tableBody.innerHTML = `
@@ -172,35 +196,99 @@ class AppRouter {
       return;
     }
 
-    tableBody.innerHTML = bills.map(b => `
-      <tr>
-        <td>
-          <strong>No. ${b.billNo || 'Draft'}</strong><br>
-          <span class="badge ${b.billType === 'gst' ? 'badge-finalized' : 'badge-partial'}" style="font-size: 0.65rem;">
-            ${b.billType === 'gst' ? 'GST INVOICE' : 'ESTIMATE'}
-          </span>
-        </td>
-        <td>
-          <strong>${b.customerName}</strong><br>
-          <small style="color: var(--text-muted);">${b.customerPhone || 'N/A'}</small>
-        </td>
-        <td>${b.date}</td>
-        <td>${(b.items || []).length} items</td>
-        <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-        <td>
-          <span class="badge ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'badge-partial' : 'badge-paid') : 'badge-draft'}">
-            ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'FINALIZED (DUE)' : 'FINALIZED (PAID)') : 'DRAFT'}
-          </span>
-        </td>
-        <td>
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.viewBillPreview(${b.id})">
-              Preview / Print
-            </button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    tableBody.innerHTML = bills.map(b => {
+      let dateDisplay = b.date || '';
+      let timeDisplay = '';
+      if (b.createdAt) {
+        const dt = new Date(b.createdAt);
+        if (!isNaN(dt.getTime())) {
+          dateDisplay = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          timeDisplay = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+      }
+
+      return `
+        <tr>
+          <td>
+            <strong>No. ${b.billNo || 'Draft'}</strong><br>
+            <span class="badge ${b.billType === 'gst' ? 'badge-finalized' : 'badge-partial'}" style="font-size: 0.65rem;">
+              ${b.billType === 'gst' ? 'GST INVOICE' : 'ESTIMATE'}
+            </span>
+          </td>
+          <td>
+            <strong>${b.customerName}</strong><br>
+            <small style="color: var(--text-muted);">${b.customerPhone || 'No Phone'}</small>
+          </td>
+          <td>
+            <strong>${dateDisplay}</strong>
+            ${timeDisplay ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;">🕒 ${timeDisplay}</small>` : ''}
+          </td>
+          <td>${(b.items || []).length} items</td>
+          <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+          <td>
+            <span class="badge ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'badge-partial' : 'badge-paid') : 'badge-draft'}">
+              ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'FINALIZED (DUE)' : 'FINALIZED (PAID)') : 'DRAFT'}
+            </span>
+          </td>
+          <td>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+              <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.viewBillPreview(${b.id})" title="View Preview & Print">
+                👁️ View
+              </button>
+              <button class="btn btn-sm btn-secondary" onclick="window.billingManager.editBill(${b.id})" title="Edit this Bill">
+                ✏️ Edit
+              </button>
+              ${b.status === 'finalized' ? `
+                <button class="btn btn-sm btn-outline-danger" onclick="window.billingManager.openReturnModal(${b.id})" title="Return / Exchange items from this bill">
+                  🔄 Return
+                </button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async loadReturnsList() {
+    const tableBody = document.getElementById('returnsListTableBody');
+    if (!tableBody) return;
+
+    const returns = await window.dbManager.getReturns();
+    returns.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (returns.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            No item returns or exchanges recorded yet. Click <strong>+ Process Return / Exchange</strong> to record customer returned goods.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = returns.map(r => {
+      const dt = new Date(r.date);
+      const dateStr = !isNaN(dt.getTime())
+        ? `${dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} <br><small style="color: var(--text-muted);">🕒 ${dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</small>`
+        : (r.date || '');
+
+      const itemsSummary = (r.items || []).map(i => `• <strong>${i.particulars}</strong> (${i.returnBoxes} boxes @ ₹${i.rate})`).join('<br>');
+      const totalBoxes = (r.items || []).reduce((sum, i) => sum + Number(i.returnBoxes || 0), 0);
+
+      return `
+        <tr>
+          <td>${dateStr}</td>
+          <td><strong>No. ${r.billNo || r.billId || 'N/A'}</strong></td>
+          <td><strong>${r.customerName}</strong><br><small style="color: var(--text-muted);">${r.customerPhone || ''}</small></td>
+          <td style="font-size: 0.85rem;">${itemsSummary}</td>
+          <td style="text-align: center;"><span class="badge badge-partial" style="font-size: 0.8rem;">${totalBoxes} Boxes</span></td>
+          <td><strong style="color: var(--danger);">₹${Number(r.totalRefundAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+          <td style="font-size: 0.85rem; color: #475569;">${r.reason || 'N/A'}</td>
+        </tr>
+      `;
+    }).join('');
   }
 
   // --- GLOBAL SEARCH ---

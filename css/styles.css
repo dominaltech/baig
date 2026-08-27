@@ -668,13 +668,14 @@ body {
 .bill-estimate-container {
   background-color: #ffffff;
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 820px;
+  margin: 15px auto;
   border: 1px solid #cbd5e1;
   padding: 0;
   font-family: 'Noto Sans Devanagari', 'Inter', sans-serif;
   color: #000000;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
   position: relative;
 }
 
@@ -682,7 +683,7 @@ body {
 .bill-estimate-header {
   background: linear-gradient(180deg, #d92525 0%, #b80d19 100%);
   color: #ffffff;
-  padding: 10px 14px;
+  padding: 12px 18px;
   position: relative;
   border-bottom: 2px solid #800016;
 }
@@ -724,7 +725,7 @@ body {
   font-family: serif;
   font-style: italic;
   float: left;
-  margin-margin-right: -40px;
+  margin-right: -40px;
 }
 
 .header-english-title {
@@ -760,8 +761,8 @@ body {
 }
 
 .header-address-line {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
   color: #ffffff;
   margin-top: 2px;
 }
@@ -769,57 +770,62 @@ body {
 .header-contact-box {
   text-align: right;
   font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 140px;
 }
 
 .contact-name {
-  color: #fde047;
-  font-weight: 800;
   font-size: 1rem;
+  font-weight: 800;
+  color: #fde047;
 }
 
 .contact-phones {
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 0.85rem;
+  margin-top: 3px;
   line-height: 1.3;
 }
 
 .payment-icons-row {
   display: flex;
-  align-items: center;
+  gap: 4px;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .pay-badge {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   font-weight: 900;
+  font-size: 0.75rem;
 }
 
-.pay-badge.gpay { color: #4285f4; }
-.pay-badge.phonepe { color: #5f259f; }
-
-/* Sub-header Customer & Bill Info Box */
-.bill-estimate-meta {
-  padding: 10px 14px;
+.pay-badge.gpay {
   background-color: #ffffff;
-  border-bottom: 1px solid #000000;
-  font-size: 0.9rem;
+  color: #ea4335;
+  border: 1px solid #cbd5e1;
+}
+
+.pay-badge.phonepe {
+  background-color: #5f259f;
+  color: #ffffff;
+}
+
+/* Sub-header Meta Rows */
+.bill-estimate-meta {
+  padding: 10px 18px;
+  border-bottom: 1px solid #cbd5e1;
+  font-size: 0.85rem;
 }
 
 .meta-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
+  gap: 12px;
 }
 
 .meta-row:last-child {
@@ -828,167 +834,116 @@ body {
 
 .meta-field {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
 }
 
 .meta-label {
   font-weight: 700;
-  color: #000000;
+  color: #0f172a;
+  margin-right: 6px;
+  white-space: nowrap;
 }
 
 .meta-value-line {
-  border-bottom: 1px solid #000000;
+  border-bottom: 1px dotted #64748b;
   flex: 1;
-  min-width: 140px;
-  padding: 0 4px;
+  min-height: 20px;
   font-weight: 600;
-  color: #000000;
+  padding: 0 4px;
 }
 
 .bill-number-display {
-  color: #c8102e;
-  font-weight: 900;
-  font-size: 1.2rem;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  color: #b80d19;
+  font-size: 1rem;
+  padding: 0 6px;
 }
 
-/* Printable Bill Table Grid */
+/* Main Estimates Printable Table */
 .bill-estimate-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0;
   table-layout: fixed;
 }
 
 .bill-estimate-table th {
-  background-color: #008097; /* Teal header matching Image 1 */
-  color: #ffffff;
+  background-color: #f1f5f9;
+  color: #0f172a;
   font-weight: 800;
   font-size: 0.85rem;
-  padding: 6px 4px;
-  border: 1px solid #000000;
+  padding: 6px 6px;
+  border: 1px solid #cbd5e1;
   text-align: center;
 }
 
 .bill-estimate-table td {
-  border: 1px solid #000000;
-  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  padding: 4px 8px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #000000;
-  height: 28px;
+  height: 26px;
   vertical-align: middle;
 }
 
-.bill-estimate-table tr:nth-child(even) td {
-  background-color: #ffffff;
+.col-tiles-no { width: 15%; text-align: center; }
+.col-particulars { width: 45%; }
+.col-boxes { width: 12%; text-align: center; }
+.col-rate { width: 13%; text-align: right; }
+.col-amount-rs { width: 15%; text-align: right; }
+
+.subhead-split {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  border-top: 1px solid #cbd5e1;
+  margin-top: 2px;
+  padding-top: 1px;
 }
 
-/* Column Widths */
-.col-tiles-no { width: 14%; text-align: center; }
-.col-particulars { width: 44%; text-align: left; }
-.col-boxes { width: 12%; text-align: center; }
-.col-rate { width: 12%; text-align: right; }
-.col-amount-rs { width: 13%; text-align: right; }
-.col-amount-ps { width: 5%; text-align: center; }
-
-/* Table Footer & Totals Section */
+/* Footer Totals Table */
 .bill-estimate-footer {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
-  border-top: 2px solid #000000;
 }
 
 .bill-estimate-footer td {
-  border: 1px solid #000000;
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.footer-notes-col {
-  width: 70%;
+  border: 1px solid #cbd5e1;
+  padding: 10px 16px;
   vertical-align: top;
 }
 
+.footer-notes-col {
+  width: 55%;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.signature-box {
+  margin-top: 30px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
 .footer-totals-col {
-  width: 30%;
+  width: 45%;
+  font-size: 0.85rem;
 }
 
 .summary-line-row {
   display: flex;
   justify-content: space-between;
-  padding: 3px 0;
-  border-bottom: 1px solid #cbd5e1;
-  font-size: 0.85rem;
-}
-
-.summary-line-row:last-child {
-  border-bottom: none;
+  margin-bottom: 5px;
+  font-weight: 600;
 }
 
 .summary-line-row.grand-total {
-  font-size: 1rem;
-  font-weight: 900;
-  color: #c8102e;
-  border-top: 2px solid #000000;
-  padding-top: 4px;
-}
-
-.signature-box {
-  margin-top: 25px;
-  text-align: right;
-  padding-right: 15px;
   font-weight: 800;
-  font-size: 0.85rem;
-}
-
-/* Responsive Styles for Mobile */
-@media (max-width: 768px) {
-  .app-header {
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-  
-  .header-search {
-    width: 100%;
-    order: 3;
-  }
-
-  .header-controls {
-    margin-left: auto;
-  }
-
-  .app-content {
-    padding: 1rem 0.75rem;
-  }
-
-  .grid-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .section-actions {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  .header-top-row {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .header-contact-box {
-    text-align: center;
-    margin-top: 6px;
-  }
+  font-size: 1rem;
+  color: #b80d19;
+  border-top: 2px solid #b80d19;
+  border-bottom: 2px solid #b80d19;
+  padding: 4px 0;
+  margin: 6px 0;
 }
 
 /* Bill Type Segmented Toggle Buttons */
@@ -1017,13 +972,14 @@ body {
 .bill-gst-container {
   background-color: #ffffff;
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 820px;
+  margin: 15px auto;
   border: 1.5px solid #742220;
   padding: 0;
   font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
   color: #000000;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
   position: relative;
 }
 
@@ -1031,7 +987,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-bottom: 1.5px solid #742220;
   font-size: 0.85rem;
   font-weight: 700;
@@ -1041,7 +997,7 @@ body {
   border: 1px solid #742220;
   background-color: #742220;
   color: #ffffff;
-  padding: 2px 12px;
+  padding: 3px 14px;
   border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 800;
@@ -1049,7 +1005,7 @@ body {
 
 .bill-gst-header-main {
   text-align: center;
-  padding: 8px 12px 6px;
+  padding: 10px 16px 8px;
   border-bottom: 1.5px solid #742220;
 }
 
@@ -1064,10 +1020,10 @@ body {
 }
 
 .bill-gst-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #000000;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .bill-gst-meta-box {
@@ -1078,12 +1034,12 @@ body {
 }
 
 .gst-meta-left {
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-right: 1.5px solid #742220;
 }
 
 .gst-meta-right {
-  padding: 8px 12px;
+  padding: 10px 16px;
 }
 
 .gst-meta-line {
@@ -1106,14 +1062,14 @@ body {
   color: #ffffff;
   font-weight: 800;
   font-size: 0.85rem;
-  padding: 6px 4px;
+  padding: 7px 6px;
   border: 1px solid #742220;
   text-align: center;
 }
 
 .bill-gst-table td {
   border: 1px solid #742220;
-  padding: 4px 6px;
+  padding: 5px 8px;
   font-size: 0.85rem;
   font-weight: 600;
   color: #000000;
@@ -1129,7 +1085,7 @@ body {
 }
 
 .gst-bank-details {
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-right: 1.5px solid #742220;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1142,7 +1098,7 @@ body {
 .gst-tax-row {
   display: flex;
   justify-content: space-between;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-bottom: 1px solid #742220;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1154,18 +1110,18 @@ body {
 
 .gst-tax-row.total-row {
   font-weight: 900;
-  font-size: 1rem;
+  font-size: 1.05rem;
   color: #742220;
   background-color: #fdf2f2;
 }
 
 .bill-gst-footer {
-  padding: 8px 12px;
+  padding: 12px 16px;
   font-size: 0.85rem;
 }
 
 .gst-words-line {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   font-weight: 700;
 }
 
@@ -1173,11 +1129,16 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-top: 20px;
+  margin-top: 24px;
   font-weight: 800;
 }
 
-/* Strict Print Stylesheet */
+/* Strict Print Stylesheet with Page Margins */
+@page {
+  margin: 10mm 12mm;
+  size: auto;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -1195,6 +1156,7 @@ body {
     position: absolute;
     left: 0;
     top: 0;
+    margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     border: 1.5px solid #742220 !important;
