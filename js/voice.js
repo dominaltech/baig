@@ -43,6 +43,11 @@ class VoiceAddressManager {
 
     this.recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('Microphone access was denied. Please allow microphone permission in your browser to use voice input.');
+      } else if (event.error === 'no-speech') {
+        console.log('No speech detected.');
+      }
       this.stopListening();
     };
 
@@ -84,17 +89,30 @@ class VoiceAddressManager {
 
   updateMicButtonUI(active) {
     const btnEn = document.getElementById('voiceMicBtnEn');
+    const btnHi = document.getElementById('voiceMicBtnHi');
     const btnMr = document.getElementById('voiceMicBtnMr');
 
     if (btnEn) {
       if (active && this.currentLocale === 'en-IN') {
         btnEn.classList.remove('btn-outline-primary');
         btnEn.classList.add('btn-danger');
-        btnEn.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg> Listening in English...`;
+        btnEn.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg> Listening (English)...`;
       } else {
         btnEn.classList.remove('btn-danger');
         btnEn.classList.add('btn-outline-primary');
         btnEn.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg> Speak (English)`;
+      }
+    }
+
+    if (btnHi) {
+      if (active && this.currentLocale === 'hi-IN') {
+        btnHi.classList.remove('btn-outline-primary');
+        btnHi.classList.add('btn-danger');
+        btnHi.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg> सुन रहा है (हिंदी)...`;
+      } else {
+        btnHi.classList.remove('btn-danger');
+        btnHi.classList.add('btn-outline-primary');
+        btnHi.innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg> हिंदी मध्ये बोला`;
       }
     }
 

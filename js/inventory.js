@@ -24,7 +24,12 @@ class InventoryManager {
 
     // Filter by Category
     if (this.currentCategory !== 'all') {
-      filtered = filtered.filter(p => p.size === this.currentCategory);
+      filtered = filtered.filter(p => {
+        if (this.currentCategory === 'Bag') {
+          return p.size === 'Bag' || p.size === 'Chemical';
+        }
+        return p.size === this.currentCategory;
+      });
     }
 
     // Filter by Search Query
@@ -106,26 +111,61 @@ class InventoryManager {
     this.renderInventoryTable();
   }
 
-  openAddModal() {
-    document.getElementById('productFormModalTitle').textContent = window.i18n.t('addProduct');
+  openAddModal(prefillName = '', targetLineIndex = null) {
+    this.targetBillingLineIndex = targetLineIndex;
+    const titleEl = document.getElementById('productFormModalTitle');
+    if (titleEl) {
+      titleEl.textContent = targetLineIndex !== null 
+        ? 'Add New Product to Stock (Auto-Fill Bill)' 
+        : window.i18n.t('addProduct');
+    }
+
+    const noticeEl = document.getElementById('productModalContextNotice');
+    if (noticeEl) {
+      noticeEl.style.display = targetLineIndex !== null ? 'block' : 'none';
+      if (targetLineIndex !== null && prefillName) {
+        noticeEl.innerHTML = `✨ <strong>New Stock Entry:</strong> Fill details for "<strong>${prefillName}</strong>" to permanently save it to your Inventory Stock. It will also be automatically filled into your current bill!`;
+      }
+    }
+
     document.getElementById('productIdInput').value = '';
-    document.getElementById('productNameInput').value = '';
+    document.getElementById('productNameInput').value = prefillName || '';
     document.getElementById('productSizeInput').value = '2x4';
+    const hsnIn = document.getElementById('productHsnInput');
+    if (hsnIn) hsnIn.value = '6907';
     document.getElementById('productRateInput').value = '';
-    document.getElementById('productStockInput').value = '';
+    document.getElementById('productStockInput').value = '100';
     document.getElementById('productMinAlertInput').value = '15';
 
     window.appRouter.openModal('productFormModal');
+
+    setTimeout(() => {
+      if (!prefillName) {
+        const nameIn = document.getElementById('productNameInput');
+        if (nameIn) nameIn.focus();
+      } else {
+        const rateIn = document.getElementById('productRateInput');
+        if (rateIn) rateIn.focus();
+      }
+    }, 120);
   }
 
   openEditModal(id) {
+    this.targetBillingLineIndex = null;
     const p = this.products.find(item => item.id === id);
     if (!p) return;
 
-    document.getElementById('productFormModalTitle').textContent = 'Edit Product';
+    const titleEl = document.getElementById('productFormModalTitle');
+    if (titleEl) titleEl.textContent = 'Edit Product';
+
+    const noticeEl = document.getElementById('productModalContextNotice');
+    if (noticeEl) noticeEl.style.display = 'none';
+
     document.getElementById('productIdInput').value = p.id;
     document.getElementById('productNameInput').value = p.name;
     document.getElementById('productSizeInput').value = p.size || '2x4';
+    const hsnIn = document.getElementById('productHsnInput');
+    if (hsnIn) hsnIn.value = p.hsnCode || '6907';
     document.getElementById('productRateInput').value = p.rate;
     document.getElementById('productStockInput').value = p.stock;
     document.getElementById('productMinAlertInput').value = p.minStockAlert || 15;
@@ -137,6 +177,8 @@ class InventoryManager {
     const id = document.getElementById('productIdInput').value;
     const name = document.getElementById('productNameInput').value.trim();
     const size = document.getElementById('productSizeInput').value.trim();
+    const hsnIn = document.getElementById('productHsnInput');
+    const hsnCode = hsnIn ? hsnIn.value.trim() : '6907';
     const rate = parseFloat(document.getElementById('productRateInput').value) || 0;
     const stock = parseInt(document.getElementById('productStockInput').value, 10) || 0;
     const minStockAlert = parseInt(document.getElementById('productMinAlertInput').value, 10) || 10;
@@ -146,9 +188,15 @@ class InventoryManager {
       return;
     }
 
+    if (rate <= 0) {
+      alert('Please enter a valid rate per box/unit (₹).');
+      return;
+    }
+
     const product = {
       name,
       size,
+      hsnCode: hsnCode || '6907',
       rate,
       stock,
       minStockAlert
@@ -158,9 +206,19 @@ class InventoryManager {
       product.id = parseInt(id, 10);
     }
 
-    await window.dbManager.saveProduct(product);
+    const savedId = await window.dbManager.saveProduct(product);
+    product.id = id ? parseInt(id, 10) : savedId;
+
     window.appRouter.closeModal('productFormModal');
     await this.loadProducts();
+
+    // If opened from Billing line items, auto-fill the line item
+    const targetIdx = this.targetBillingLineIndex;
+    this.targetBillingLineIndex = null;
+
+    if (targetIdx !== null && targetIdx !== undefined && window.billingManager) {
+      await window.billingManager.onProductAddedFromModal(product, targetIdx);
+    }
   }
 
   async deleteProduct(id) {

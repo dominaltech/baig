@@ -62,6 +62,7 @@ const translations = {
     btnDownloadImage: "Download Image",
     btnCancel: "Cancel",
     btnSave: "Save",
+    btnSaveStock: "Save Product to Stock",
     
     // Inventory
     inventoryTitle: "Product Inventory & Stock",
@@ -120,7 +121,10 @@ const translations = {
     roleStaff: "स्टाफ मोड",
     
     // Billing View
+    createBillTitle: "बिल बनाएं",
     createEstimateTitle: "एस्टीमेट बिल तैयार करें",
+    billTypeEstimate: "एस्टीमेट बिल",
+    billTypeGst: "GST टैक्स इनवॉइस",
     customerDetails: "ग्राहक विवरण",
     customerName: "ग्राहक का नाम / प्रति",
     customerPhone: "मोबाइल नंबर",
@@ -158,6 +162,7 @@ const translations = {
     btnDownloadImage: "इमेज डाउनलोड करें",
     btnCancel: "रद्द करें",
     btnSave: "सहेजें",
+    btnSaveStock: "स्टॉक में सहेजें",
     
     // Inventory
     inventoryTitle: "उत्पाद सूची एवं स्टॉक प्रबंधन",
@@ -216,7 +221,10 @@ const translations = {
     roleStaff: "स्टाफ मोड",
     
     // Billing View
+    createBillTitle: "बिल तयार करा",
     createEstimateTitle: "एस्टीमेट बिल तयार करा",
+    billTypeEstimate: "एस्टीमेट बिल",
+    billTypeGst: "GST टॅक्स इनव्हॉईस",
     customerDetails: "ग्राहकाची माहिती",
     customerName: "ग्राहकाचे नाव / प्रति",
     customerPhone: "मोबाईल नंबर",
@@ -254,6 +262,7 @@ const translations = {
     btnDownloadImage: "इमेज डाऊनलोड करा",
     btnCancel: "रद्द करा",
     btnSave: "जतन करा",
+    btnSaveStock: "स्टॉकमध्ये जतन करा",
     
     // Inventory
     inventoryTitle: "साठा (स्टॉक) व्यवस्थापन",

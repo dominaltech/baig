@@ -29,10 +29,7 @@ class AppRouter {
     }
     this.applyRoleRestrictions();
 
-    // 4. Initial View Render
-    await this.switchView('billing');
-
-    // 5. Setup Search Bar Listener
+    // 4. Setup Search Bar Listener
     const searchInput = document.getElementById('globalSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => this.handleGlobalSearch(e.target.value));
@@ -178,25 +175,173 @@ class AppRouter {
     }
   }
 
+  onBillFilterChange() {
+    const qIn = document.getElementById('billFilterQuery');
+    const fromDateIn = document.getElementById('billFilterFromDate');
+    const toDateIn = document.getElementById('billFilterToDate');
+    const fromBillIn = document.getElementById('billFilterFromBill');
+    const toBillIn = document.getElementById('billFilterToBill');
+    const statusIn = document.getElementById('billFilterStatus');
+    const sortIn = document.getElementById('billFilterSort');
+
+    this.billFilters = {
+      query: qIn ? qIn.value.trim().toLowerCase() : '',
+      fromDate: fromDateIn ? fromDateIn.value : '',
+      toDate: toDateIn ? toDateIn.value : '',
+      fromBill: fromBillIn ? fromBillIn.value.trim() : '',
+      toBill: toBillIn ? toBillIn.value.trim() : '',
+      status: statusIn ? statusIn.value : 'all',
+      sort: sortIn ? sortIn.value : 'recent'
+    };
+
+    this.loadBillsList();
+  }
+
+  resetBillFilters() {
+    const qIn = document.getElementById('billFilterQuery');
+    const fromDateIn = document.getElementById('billFilterFromDate');
+    const toDateIn = document.getElementById('billFilterToDate');
+    const fromBillIn = document.getElementById('billFilterFromBill');
+    const toBillIn = document.getElementById('billFilterToBill');
+    const statusIn = document.getElementById('billFilterStatus');
+    const sortIn = document.getElementById('billFilterSort');
+
+    if (qIn) qIn.value = '';
+    if (fromDateIn) fromDateIn.value = '';
+    if (toDateIn) toDateIn.value = '';
+    if (fromBillIn) fromBillIn.value = '';
+    if (toBillIn) toBillIn.value = '';
+    if (statusIn) statusIn.value = 'all';
+    if (sortIn) sortIn.value = 'recent';
+
+    this.billFilters = {
+      query: '',
+      fromDate: '',
+      toDate: '',
+      fromBill: '',
+      toBill: '',
+      status: 'all',
+      sort: 'recent'
+    };
+
+    this.loadBillsList();
+  }
+
   async loadBillsList() {
     const tableBody = document.getElementById('billsListTableBody');
     if (!tableBody) return;
 
-    const bills = await window.dbManager.getBills();
-    bills.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    if (!this.billFilters) {
+      this.billFilters = {
+        query: '',
+        fromDate: '',
+        toDate: '',
+        fromBill: '',
+        toBill: '',
+        status: 'all',
+        sort: 'recent'
+      };
+    }
+
+    const rawBills = await window.dbManager.getBills();
+    let bills = [...rawBills];
+
+    // 1. Search Query Filter (Customer Name, Phone, Address, GSTIN, Bill No, Item particulars)
+    if (this.billFilters.query) {
+      const q = this.billFilters.query;
+      bills = bills.filter(b => {
+        const itemsMatch = (b.items || []).some(i => i.particulars && i.particulars.toLowerCase().includes(q));
+        return (b.customerName && b.customerName.toLowerCase().includes(q)) ||
+               (b.customerPhone && b.customerPhone.toLowerCase().includes(q)) ||
+               (b.customerAddress && b.customerAddress.toLowerCase().includes(q)) ||
+               (b.customerGstin && b.customerGstin.toLowerCase().includes(q)) ||
+               (b.billNo && String(b.billNo).toLowerCase().includes(q)) ||
+               itemsMatch;
+      });
+    }
+
+    // 2. Date Range Filter (From Date -> To Date)
+    if (this.billFilters.fromDate || this.billFilters.toDate) {
+      const fromStr = this.billFilters.fromDate || '';
+      const toStr = this.billFilters.toDate || '';
+
+      bills = bills.filter(b => {
+        const bDateStr = b.date || (b.createdAt ? b.createdAt.split('T')[0] : '');
+        if (!bDateStr) return false;
+        if (fromStr && bDateStr < fromStr) return false;
+        if (toStr && bDateStr > toStr) return false;
+        return true;
+      });
+    }
+
+    // 3. Bill Number Range Filter (From Bill # -> To Bill #)
+    // If only fromBill is entered -> matches that exact single bill!
+    if (this.billFilters.fromBill) {
+      const fromBillNo = parseInt(this.billFilters.fromBill, 10);
+      const toBillNo = this.billFilters.toBill ? parseInt(this.billFilters.toBill, 10) : fromBillNo;
+
+      bills = bills.filter(b => {
+        if (!b.billNo) return false;
+        const bNo = parseInt(b.billNo, 10);
+        if (isNaN(bNo)) return false;
+        return bNo >= fromBillNo && bNo <= toBillNo;
+      });
+    }
+
+    // 4. Status / Type Filter
+    if (this.billFilters.status === 'paid') {
+      bills = bills.filter(b => b.status === 'finalized' && (!b.balanceDue || b.balanceDue <= 0));
+    } else if (this.billFilters.status === 'due') {
+      bills = bills.filter(b => b.status === 'finalized' && b.balanceDue > 0);
+    } else if (this.billFilters.status === 'draft') {
+      bills = bills.filter(b => b.status !== 'finalized');
+    } else if (this.billFilters.status === 'gst') {
+      bills = bills.filter(b => b.billType === 'gst');
+    } else if (this.billFilters.status === 'estimate') {
+      bills = bills.filter(b => b.billType !== 'gst');
+    }
+
+    // 5. Sort Order
+    if (this.billFilters.sort === 'oldest') {
+      bills.sort((a, b) => new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date));
+    } else if (this.billFilters.sort === 'amount_high') {
+      bills.sort((a, b) => (b.total || 0) - (a.total || 0));
+    } else if (this.billFilters.sort === 'amount_low') {
+      bills.sort((a, b) => (a.total || 0) - (b.total || 0));
+    } else {
+      // Default: Latest bills (Newest first)
+      bills.sort((a, b) => {
+        const timeB = new Date(b.createdAt || b.date).getTime() || 0;
+        const timeA = new Date(a.createdAt || a.date).getTime() || 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+    }
+
+    // Update Stats Summary in header
+    const statsEl = document.getElementById('billsStatsSummary');
+    if (statsEl) {
+      const sumTotal = bills.reduce((sum, b) => sum + (b.total || 0), 0);
+      const sumDues = bills.reduce((sum, b) => sum + (b.balanceDue || 0), 0);
+      statsEl.innerHTML = `
+        <span class="badge badge-finalized" style="font-size: 0.75rem;">${bills.length} Bills</span>
+        <span style="font-size: 0.82rem;">Total: <strong>₹${sumTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></span>
+        <span style="font-size: 0.82rem;">Dues: <strong style="color: var(--danger);">₹${sumDues.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></span>
+      `;
+    }
 
     if (bills.length === 0) {
       tableBody.innerHTML = `
         <tr>
           <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-            No bills created yet. Click <strong>New Bill</strong> to issue your first estimate.
+            No bills found matching your filter criteria. Click <strong>↺ Reset Filters</strong> to view all.
           </td>
         </tr>
       `;
       return;
     }
 
-    tableBody.innerHTML = bills.map(b => {
+    tableBody.innerHTML = bills.map((b, idx) => {
       let dateDisplay = b.date || '';
       let timeDisplay = '';
       if (b.createdAt) {
@@ -210,13 +355,13 @@ class AppRouter {
       return `
         <tr>
           <td>
-            <strong>No. ${b.billNo || 'Draft'}</strong><br>
+            <strong style="font-size: 1rem; color: var(--accent-blue);">No. ${b.billNo || 'Draft'}</strong><br>
             <span class="badge ${b.billType === 'gst' ? 'badge-finalized' : 'badge-partial'}" style="font-size: 0.65rem;">
               ${b.billType === 'gst' ? 'GST INVOICE' : 'ESTIMATE'}
             </span>
           </td>
           <td>
-            <strong>${b.customerName}</strong><br>
+            <strong style="font-size: 0.95rem;">${b.customerName}</strong><br>
             <small style="color: var(--text-muted);">${b.customerPhone || 'No Phone'}</small>
           </td>
           <td>
@@ -224,7 +369,7 @@ class AppRouter {
             ${timeDisplay ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;"><svg class="svg-icon" style="width: 12px; height: 12px; vertical-align: -1px; margin-right: 2px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeDisplay}</small>` : ''}
           </td>
           <td>${(b.items || []).length} items</td>
-          <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+          <td><strong style="font-size: 0.95rem;">₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
           <td>
             <span class="badge ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'badge-partial' : 'badge-paid') : 'badge-draft'}">
               ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'FINALIZED (DUE)' : 'FINALIZED (PAID)') : 'DRAFT'}
@@ -296,38 +441,95 @@ class AppRouter {
 
   // --- GLOBAL SEARCH ---
   async handleGlobalSearch(query) {
-    const q = query.trim().toLowerCase();
-    if (!q) return;
+    const q = (query || '').trim().toLowerCase();
 
     if (this.currentView === 'inventory') {
       window.inventoryManager.searchProducts(q);
     } else if (this.currentView === 'customers') {
       window.customerManager.searchCustomers(q);
     } else if (this.currentView === 'bills') {
+      if (!q) {
+        await this.loadBillsList();
+        return;
+      }
       const tableBody = document.getElementById('billsListTableBody');
+      if (!tableBody) return;
       const bills = await window.dbManager.getBills();
       const filtered = bills.filter(b => 
         (b.customerName && b.customerName.toLowerCase().includes(q)) ||
         (b.customerPhone && b.customerPhone.toLowerCase().includes(q)) ||
+        (b.customerAddress && b.customerAddress.toLowerCase().includes(q)) ||
         (b.billNo && b.billNo.toString().includes(q)) ||
         (b.date && b.date.includes(q))
       );
+      filtered.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
 
-      tableBody.innerHTML = filtered.map(b => `
-        <tr>
-          <td><strong>No. ${b.billNo || 'Draft'}</strong></td>
-          <td><strong>${b.customerName}</strong></td>
-          <td>${b.date}</td>
-          <td>${(b.items || []).length} items</td>
-          <td><strong>₹${(b.total || 0).toLocaleString('en-IN')}</strong></td>
-          <td><span class="badge ${b.status === 'finalized' ? 'badge-paid' : 'badge-draft'}">${b.status}</span></td>
-          <td>
-            <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.viewBillPreview(${b.id})">
-              Preview
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      if (filtered.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No bills found matching "${query}".
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = filtered.map(b => {
+        let dateDisplay = b.date || '';
+        let timeDisplay = '';
+        if (b.createdAt) {
+          const dt = new Date(b.createdAt);
+          if (!isNaN(dt.getTime())) {
+            dateDisplay = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            timeDisplay = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          }
+        }
+
+        return `
+          <tr>
+            <td>
+              <strong>No. ${b.billNo || 'Draft'}</strong><br>
+              <span class="badge ${b.billType === 'gst' ? 'badge-finalized' : 'badge-partial'}" style="font-size: 0.65rem;">
+                ${b.billType === 'gst' ? 'GST INVOICE' : 'ESTIMATE'}
+              </span>
+            </td>
+            <td>
+              <strong>${b.customerName}</strong><br>
+              <small style="color: var(--text-muted);">${b.customerPhone || 'No Phone'}</small>
+            </td>
+            <td>
+              <strong>${dateDisplay}</strong>
+              ${timeDisplay ? `<br><small style="color: var(--text-muted); font-size: 0.75rem;"><svg class="svg-icon" style="width: 12px; height: 12px; vertical-align: -1px; margin-right: 2px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${timeDisplay}</small>` : ''}
+            </td>
+            <td>${(b.items || []).length} items</td>
+            <td><strong>₹${(b.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+            <td>
+              <span class="badge ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'badge-partial' : 'badge-paid') : 'badge-draft'}">
+                ${b.status === 'finalized' ? (b.balanceDue > 0 ? 'FINALIZED (DUE)' : 'FINALIZED (PAID)') : 'DRAFT'}
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.viewBillPreview(${b.id})" title="View Preview & Print">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <span>View</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="window.billingManager.editBill(${b.id})" title="Edit this Bill">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  <span>Edit</span>
+                </button>
+                ${b.status === 'finalized' ? `
+                  <button class="btn btn-sm btn-outline-danger" onclick="window.billingManager.openReturnModal(${b.id})" title="Return / Exchange items from this bill">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    <span>Return</span>
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 

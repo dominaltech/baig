@@ -121,18 +121,12 @@
         <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 0.75rem;" data-i18n="customerDetails">Customer Information</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
           
-          <div class="form-group">
-            <label class="form-label" data-i18n="selectCustomer">Select Existing Customer</label>
-            <select id="customerSelect" class="form-control" onchange="window.billingManager.onCustomerSelectChange(this.value)">
-              <option value="">-- Select Existing Customer --</option>
-            </select>
-          </div>
-
           <div class="form-group" style="position: relative;">
-            <label class="form-label" data-i18n="customerName">Customer Name / To</label>
+            <label class="form-label" data-i18n="customerName">Customer Name / To *</label>
             <input type="text" id="customerNameInput" class="form-control" 
-                   placeholder="Type customer name to search..." 
+                   placeholder="Type name to search existing or enter new..." 
                    autocomplete="off"
+                   onkeydown="window.billingManager.onCustomerKeyDown(event)"
                    oninput="window.billingManager.onCustomerNameInput(this.value)" 
                    onfocus="window.billingManager.onCustomerNameInput(this.value)"
                    onblur="window.billingManager.onCustomerBlur()">
@@ -146,7 +140,7 @@
 
           <div id="gstinFieldGroup" class="form-group gst-field-only" style="display: none;">
             <label class="form-label">Customer GSTIN</label>
-            <input type="text" id="customerGstinInput" class="form-control" placeholder="e.g. 27AAAAA57038P1ZX">
+            <input type="text" id="customerGstinInput" class="form-control" placeholder="e.g. 27AAAAA57038P1ZX" oninput="this.value = this.value.toUpperCase()">
           </div>
 
           <div class="form-group">
@@ -164,6 +158,10 @@
               <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg>
               Speak (English)
             </button>
+            <button type="button" id="voiceMicBtnHi" class="btn btn-sm btn-outline-primary" onclick="window.voiceManager.startVoiceInput('hi-IN', 'customerAddressInput', 'voiceMicBtnHi')" title="हिंदी में पता बोलें">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg>
+              हिंदी मध्ये बोला
+            </button>
             <button type="button" id="voiceMicBtnMr" class="btn btn-sm btn-outline-primary" onclick="window.voiceManager.startVoiceInput('mr-IN', 'customerAddressInput', 'voiceMicBtnMr')" title="मराठीत पत्ता बोला">
               <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg>
               मराठी मध्ये बोला
@@ -174,9 +172,15 @@
 
       <!-- Line Items Table Card -->
       <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
           <h3 style="font-size: 1rem; color: var(--accent-blue);">Particulars & Items</h3>
-          <button class="btn btn-sm btn-outline-primary" onclick="window.billingManager.addLineItem()" data-i18n="addItem">+ Add New Item</button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.inventoryManager.openAddModal('', null)" title="Add new product with full stock parameters to Inventory">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+              <span>+ Add to Stock (Popup)</span>
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="window.billingManager.addLineItem()" data-i18n="addItem">+ Add Row</button>
+          </div>
         </div>
 
         <div class="table-responsive billing-table-responsive">
@@ -272,6 +276,78 @@
         </div>
       </div>
 
+      <!-- Advanced Filter Toolbar for Bills -->
+      <div class="card" style="margin-bottom: 1.25rem; padding: 1rem 1.25rem;">
+        <div style="font-weight: 700; font-size: 0.9rem; color: var(--accent-blue); margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg class="svg-icon" style="width: 16px; height: 16px;" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+            <span>Filter Bills History</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div id="billsStatsSummary" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;"></div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="window.appRouter.resetBillFilters()" title="Reset all bill filters">
+              ↺ Reset Filters
+            </button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem; align-items: end;">
+          <!-- 1. Customer / Phone Search -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">Customer Name / Phone</label>
+            <input type="text" id="billFilterQuery" class="form-control" placeholder="Search name, phone, city..." oninput="window.appRouter.onBillFilterChange()">
+          </div>
+
+          <!-- 2. Date Range: From Date -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">From Date</label>
+            <input type="date" id="billFilterFromDate" class="form-control" onchange="window.appRouter.onBillFilterChange()">
+          </div>
+
+          <!-- 3. Date Range: To Date -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">To Date</label>
+            <input type="date" id="billFilterToDate" class="form-control" onchange="window.appRouter.onBillFilterChange()">
+          </div>
+
+          <!-- 4. Bill Number Range: From Bill No -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">From Bill #</label>
+            <input type="number" id="billFilterFromBill" class="form-control" placeholder="e.g. 940" oninput="window.appRouter.onBillFilterChange()">
+          </div>
+
+          <!-- 5. Bill Number Range: To Bill No -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">To Bill # (Optional)</label>
+            <input type="number" id="billFilterToBill" class="form-control" placeholder="e.g. 950" oninput="window.appRouter.onBillFilterChange()">
+          </div>
+
+          <!-- 6. Bill Status / Type -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">Bill Status</label>
+            <select id="billFilterStatus" class="form-control" onchange="window.appRouter.onBillFilterChange()">
+              <option value="all">All Bills</option>
+              <option value="paid">Finalized (Paid)</option>
+              <option value="due">Finalized (With Due)</option>
+              <option value="draft">Drafts Only</option>
+              <option value="gst">GST Tax Invoices</option>
+              <option value="estimate">Estimate Bills</option>
+            </select>
+          </div>
+
+          <!-- 7. Sort Order -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.8rem;">Sort Order</label>
+            <select id="billFilterSort" class="form-control" onchange="window.appRouter.onBillFilterChange()">
+              <option value="recent">Latest Bills (Newest First)</option>
+              <option value="oldest">Oldest Bills First</option>
+              <option value="amount_high">Highest Amount (₹)</option>
+              <option value="amount_low">Lowest Amount (₹)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <!-- All Bills Container -->
       <div id="allBillsListContainer">
         <div class="table-responsive">
@@ -357,13 +433,31 @@
     <section id="view-customers" class="view-section">
       <div class="section-header">
         <h2 class="section-title" data-i18n="customersTitle">Customer Database</h2>
+        <div class="section-actions" id="customerStatsSummary" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <!-- Populated dynamically by customers.js -->
+        </div>
+      </div>
+
+      <!-- Clean Customer Search Card -->
+      <div class="card" style="margin-bottom: 1.25rem; padding: 0.85rem 1.25rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <div style="position: relative; flex: 1;">
+            <input type="text" id="customerSearchInput" class="form-control" 
+                   placeholder="Search by customer name, mobile no, address, city..." 
+                   autocomplete="off"
+                   oninput="window.customerManager.searchCustomers(this.value)">
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="window.customerManager.clearSearch()" title="Clear customer search">
+            Clear
+          </button>
+        </div>
       </div>
 
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th style="width: 70px; text-align: center;">Sr. No.</th>
               <th>Customer Name</th>
               <th>Mobile No.</th>
               <th>Address</th>
@@ -473,6 +567,8 @@
     <section id="view-settings" class="view-section">
       <div class="section-header">
         <h2 class="section-title" data-i18n="settingsTitle">App Settings & Data Export</h2>
+      </div>
+
       <div class="card" style="background-color: var(--accent-blue-light); border-color: var(--accent-blue);">
         <h3 style="font-size: 1rem; color: var(--accent-blue); margin-bottom: 0.5rem;" data-i18n="installAppLabel">Install Application (Mobile & PC)</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Install Baig Tiles & Granite CRM as a standalone app directly on your Desktop PC or Mobile device for full offline access.</p>
@@ -500,50 +596,68 @@
 
   </main>
 
-  <!-- MODAL 1: ADD/EDIT PRODUCT -->
+  <!-- MODAL 1: ADD/EDIT PRODUCT (STOCK PANEL POPUP) -->
   <div id="productFormModal" class="modal-backdrop">
     <div class="modal-container">
       <div class="modal-header">
-        <h3 id="productFormModalTitle" class="modal-title">Add Product</h3>
+        <h3 id="productFormModalTitle" class="modal-title">Add Product to Stock</h3>
         <button class="modal-close" onclick="window.appRouter.closeModal('productFormModal')">✕</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="productIdInput">
         
+        <!-- Contextual notice when opened from billing -->
+        <div id="productModalContextNotice" style="display: none; background-color: #ecfdf5; border: 1px solid #6ee7b7; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #065f46; margin-bottom: 1rem;">
+          ✨ <strong>New Stock Entry:</strong> Enter all product parameters below to add it to permanent Stock Inventory. It will also be automatically filled into your current bill!
+        </div>
+
         <div class="form-group">
-          <label class="form-label" data-i18n="productName">Product Name</label>
+          <label class="form-label" data-i18n="productName">Product Name *</label>
           <input type="text" id="productNameInput" class="form-control" placeholder="e.g. COSMOS NERO GL">
         </div>
 
-        <div class="form-group">
-          <label class="form-label" data-i18n="productSize">Size / Category</label>
-          <select id="productSizeInput" class="form-control">
-            <option value="2x4">2x4 Tiles</option>
-            <option value="12x18">12x18 Tiles</option>
-            <option value="16x16">16x16 Tiles</option>
-            <option value="Granite">Granite</option>
-            <option value="Bag">Chemical Bag</option>
-          </select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" data-i18n="productSize">Size / Category</label>
+            <select id="productSizeInput" class="form-control">
+              <option value="2x4">2x4 Tiles</option>
+              <option value="12x18">12x18 Tiles</option>
+              <option value="16x16">16x16 Tiles</option>
+              <option value="Granite">Granite</option>
+              <option value="Bag">Chemical Bag</option>
+              <option value="Chemical">Chemical / Visdra</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">HSN Code (for GST)</label>
+            <input type="text" id="productHsnInput" class="form-control" placeholder="e.g. 6907" value="6907">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label">Rate per Box / Unit (₹) *</label>
+            <input type="number" id="productRateInput" class="form-control" placeholder="e.g. 45" min="0" step="0.01">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="currentStock">Current Stock (Boxes) *</label>
+            <input type="number" id="productStockInput" class="form-control" placeholder="e.g. 150" min="0">
+          </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Rate per Box / Unit (₹)</label>
-          <input type="number" id="productRateInput" class="form-control" placeholder="e.g. 45">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" data-i18n="currentStock">Current Stock (Boxes)</label>
-          <input type="number" id="productStockInput" class="form-control" placeholder="e.g. 150">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" data-i18n="minStockAlert">Min Stock Alert Threshold</label>
-          <input type="number" id="productMinAlertInput" class="form-control" value="15">
+          <label class="form-label" data-i18n="minStockAlert">Min Stock Alert Threshold (Boxes)</label>
+          <input type="number" id="productMinAlertInput" class="form-control" value="15" min="1">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="window.appRouter.closeModal('productFormModal')" data-i18n="btnCancel">Cancel</button>
-        <button class="btn btn-primary" onclick="window.inventoryManager.saveProductFromModal()" data-i18n="btnSave">Save Product</button>
+        <button class="btn btn-success" onclick="window.inventoryManager.saveProductFromModal()" data-i18n="btnSave">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          <span>Save Product to Stock</span>
+        </button>
       </div>
     </div>
   </div>

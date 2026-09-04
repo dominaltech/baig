@@ -32,7 +32,7 @@ class DuesManager {
     if (pendingBills.length === 0) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--success); padding: 2rem; font-weight: 600;">
+          <td colspan="8" style="text-align: center; color: var(--success); padding: 2rem; font-weight: 600;">
             ✓ All accounts clear! No pending customer dues outstanding.
           </td>
         </tr>
@@ -74,6 +74,7 @@ class DuesManager {
     if (!bill) return;
 
     this.selectedBillId = billId;
+    this.selectedBillMaxDue = bill.balanceDue;
     document.getElementById('payCustomerName').textContent = bill.customerName;
     document.getElementById('payBillNo').textContent = `Bill No. ${bill.billNo}`;
     document.getElementById('payCurrentBalance').textContent = `₹${bill.balanceDue.toLocaleString('en-IN')}`;
@@ -89,14 +90,23 @@ class DuesManager {
     const amount = parseFloat(amountInput.value) || 0;
 
     if (amount <= 0) {
-      alert('Please enter a valid payment amount.');
+      alert('Please enter a valid payment amount greater than 0.');
+      return;
+    }
+
+    if (this.selectedBillMaxDue !== undefined && amount > this.selectedBillMaxDue) {
+      alert(`Payment amount (₹${amount.toLocaleString('en-IN')}) cannot exceed current outstanding balance (₹${this.selectedBillMaxDue.toLocaleString('en-IN')}).`);
       return;
     }
 
     await window.dbManager.recordPayment(this.selectedBillId, amount);
     window.appRouter.closeModal('receivePaymentModal');
     this.selectedBillId = null;
+    this.selectedBillMaxDue = null;
     await this.loadDues();
+    if (window.customerManager) {
+      await window.customerManager.loadCustomers();
+    }
   }
 }
 

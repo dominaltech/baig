@@ -6,7 +6,7 @@
 
 // --- Utility: Indian Currency Number to Words Converter with Paisa Precision ---
 function numberToWords(num) {
-  if (num === null || num === undefined || isNaN(num) || num === 0) return 'Zero Rupees Only';
+  if (num === null || num === undefined || isNaN(num) || num <= 0) return 'Zero Rupees Only';
 
   const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
     'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -42,11 +42,16 @@ function numberToWords(num) {
 class BillingManager {
   constructor() {
     this.currentBillId = null;
+    this.currentBillNo = null;
+    this.currentBillStatus = 'draft';
+    this.currentBillCreatedAt = null;
     this.billType = 'estimate'; // Default to Estimate mode
     this.lineItems = [];
     this.products = [];
     this.customers = [];
     this.bills = [];
+    this.customerSuggestions = [];
+    this.activeCustomerIdx = -1;
   }
 
   async initBillingForm() {
@@ -54,11 +59,13 @@ class BillingManager {
     this.customers = await window.dbManager.getCustomers();
     this.bills = await window.dbManager.getBills();
 
-    this.populateCustomerDropdown();
-
     // Reset Form
     this.currentBillId = null;
-    document.getElementById('customerSelect').value = '';
+    this.currentBillNo = null;
+    this.currentBillStatus = 'draft';
+    this.currentBillCreatedAt = null;
+    this.customerSuggestions = [];
+    this.activeCustomerIdx = -1;
     document.getElementById('customerNameInput').value = '';
     document.getElementById('customerPhoneInput').value = '';
     document.getElementById('customerAddressInput').value = '';
@@ -146,41 +153,45 @@ class BillingManager {
         <th style="width: 6%;">Action</th>
       `;
     }
+
+    if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
+      window.i18n.applyTranslations();
+    }
   }
 
-  populateCustomerDropdown() {
-    const custSelect = document.getElementById('customerSelect');
-    if (!custSelect) return;
-
-    custSelect.innerHTML = `<option value="">${window.i18n.t('selectCustomer')}</option>` +
-      this.customers.map(c => `<option value="${c.id}">${c.name} (${c.phone || 'No Phone'})</option>`).join('');
-  }
-
-  // --- CUSTOMER AUTOCOMPLETE SEARCH ---
+  // --- CUSTOMER AUTOCOMPLETE SEARCH WITH KEYBOARD ARROW NAVIGATION ---
   onCustomerNameInput(value) {
     const listEl = document.getElementById('customerAutocompleteList');
     if (!listEl) return;
 
     const q = (value || '').trim().toLowerCase();
+    const sortedCustomers = [...this.customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    let matches = [];
     if (!q) {
-      listEl.style.display = 'none';
-      return;
+      matches = sortedCustomers.slice(0, 8);
+    } else {
+      matches = sortedCustomers.filter(c => 
+        (c.name && c.name.toLowerCase().includes(q)) || 
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q)) ||
+        (c.gstin && c.gstin.toLowerCase().includes(q))
+      ).slice(0, 8);
     }
 
-    const sortedCustomers = [...this.customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const matches = sortedCustomers.filter(c => 
-      (c.name && c.name.toLowerCase().includes(q)) || 
-      (c.phone && c.phone.toLowerCase().includes(q)) ||
-      (c.address && c.address.toLowerCase().includes(q))
-    ).slice(0, 8);
+    this.customerSuggestions = matches;
+    this.activeCustomerIdx = matches.length > 0 ? 0 : -1;
 
     if (matches.length === 0) {
       listEl.style.display = 'none';
       return;
     }
 
-    listEl.innerHTML = matches.map(c => `
-      <div class="autocomplete-item" onmousedown="window.billingManager.selectCustomerSuggestion(${c.id})">
+    listEl.innerHTML = matches.map((c, idx) => `
+      <div class="autocomplete-item ${idx === this.activeCustomerIdx ? 'selected' : ''}" 
+           id="cust-sugg-item-${idx}" 
+           onmouseenter="window.billingManager.setActiveCustomerSuggestion(${idx})"
+           onmousedown="window.billingManager.selectCustomerSuggestion(${c.id})">
         <div>
           <div class="autocomplete-item-title">${c.name}</div>
           <div class="autocomplete-item-sub"><svg class="svg-icon" style="width:11px;height:11px;vertical-align:-1px;margin-right:2px;" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${c.phone || 'No Phone'} • 📍 ${c.address || 'Solapur'}</div>
@@ -192,11 +203,69 @@ class BillingManager {
     listEl.style.display = 'block';
   }
 
+  onCustomerKeyDown(event) {
+    const listEl = document.getElementById('customerAutocompleteList');
+    const isListVisible = listEl && listEl.style.display !== 'none';
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!isListVisible) {
+        this.onCustomerNameInput(document.getElementById('customerNameInput').value);
+        return;
+      }
+      if (this.customerSuggestions.length > 0) {
+        this.activeCustomerIdx = (this.activeCustomerIdx + 1) % this.customerSuggestions.length;
+        this.updateCustomerSuggestionHighlight();
+      }
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (isListVisible && this.customerSuggestions.length > 0) {
+        this.activeCustomerIdx = (this.activeCustomerIdx - 1 + this.customerSuggestions.length) % this.customerSuggestions.length;
+        this.updateCustomerSuggestionHighlight();
+      }
+    } else if (event.key === 'Enter') {
+      if (isListVisible && this.activeCustomerIdx >= 0 && this.activeCustomerIdx < this.customerSuggestions.length) {
+        event.preventDefault();
+        const selected = this.customerSuggestions[this.activeCustomerIdx];
+        this.selectCustomerSuggestion(selected.id);
+        const phoneIn = document.getElementById('customerPhoneInput');
+        if (phoneIn) phoneIn.focus();
+      }
+    } else if (event.key === 'Tab') {
+      if (isListVisible && this.activeCustomerIdx >= 0 && this.activeCustomerIdx < this.customerSuggestions.length) {
+        const selected = this.customerSuggestions[this.activeCustomerIdx];
+        this.selectCustomerSuggestion(selected.id);
+      }
+    } else if (event.key === 'Escape') {
+      if (listEl) listEl.style.display = 'none';
+      this.activeCustomerIdx = -1;
+    }
+  }
+
+  setActiveCustomerSuggestion(idx) {
+    this.activeCustomerIdx = idx;
+    this.updateCustomerSuggestionHighlight();
+  }
+
+  updateCustomerSuggestionHighlight() {
+    const listEl = document.getElementById('customerAutocompleteList');
+    if (!listEl) return;
+    const items = listEl.querySelectorAll('.autocomplete-item');
+    items.forEach((el, idx) => {
+      if (idx === this.activeCustomerIdx) {
+        el.classList.add('selected');
+        el.scrollIntoView({ block: 'nearest' });
+      } else {
+        el.classList.remove('selected');
+      }
+    });
+  }
+
   onCustomerBlur() {
     setTimeout(() => {
       const listEl = document.getElementById('customerAutocompleteList');
       if (listEl) listEl.style.display = 'none';
-    }, 200);
+    }, 220);
   }
 
   selectCustomerSuggestion(customerId) {
@@ -208,23 +277,17 @@ class BillingManager {
     document.getElementById('customerAddressInput').value = c.address || '';
     const gstinEl = document.getElementById('customerGstinInput');
     if (gstinEl) gstinEl.value = c.gstin || '';
-    const custSelect = document.getElementById('customerSelect');
-    if (custSelect) custSelect.value = c.id;
 
     // Auto-lookup previous outstanding dues for this customer across past bills
-    const custBills = this.bills.filter(b => b.customerId === c.id || b.customerPhone === c.phone);
+    const custBills = this.bills.filter(b => b.customerId === c.id || (c.phone && c.phone.trim() !== '' && b.customerPhone === c.phone));
     const totalDues = custBills.reduce((sum, b) => sum + (b.balanceDue || 0), 0);
     document.getElementById('previousDuesInput').value = totalDues;
 
     const listEl = document.getElementById('customerAutocompleteList');
     if (listEl) listEl.style.display = 'none';
+    this.activeCustomerIdx = -1;
 
     this.calculateTotals();
-  }
-
-  onCustomerSelectChange(customerId) {
-    if (!customerId) return;
-    this.selectCustomerSuggestion(customerId);
   }
 
   // --- LINE ITEMS TABLE WITH TYPE-AHEAD SEARCH AUTOCOMPLETE ---
@@ -248,6 +311,7 @@ class BillingManager {
                    value="${item.particulars || ''}" 
                    placeholder="Type product name or size..." 
                    autocomplete="off"
+                   onkeydown="window.billingManager.onProductKeyDown(event, ${idx})"
                    oninput="window.billingManager.onProductInput(${idx}, this.value)"
                    onfocus="window.billingManager.onProductInput(${idx}, this.value)"
                    onblur="window.billingManager.onProductBlur(${idx})">
@@ -264,12 +328,12 @@ class BillingManager {
         ` : ''}
 
         <td>
-          <input type="number" id="line-boxes-${idx}" class="form-control" min="0" value="${item.boxes !== undefined && item.boxes !== null && item.boxes !== 0 ? item.boxes : ''}" 
+          <input type="number" id="line-boxes-${idx}" class="form-control" min="0" value="${item.boxes !== undefined && item.boxes !== null ? item.boxes : 1}" 
                  placeholder="0"
                  oninput="window.billingManager.updateLineItem(${idx}, 'boxes', this.value)">
         </td>
         <td>
-          <input type="number" id="line-rate-${idx}" class="form-control" min="0" step="0.01" value="${item.rate !== undefined && item.rate !== null && item.rate !== 0 ? item.rate : ''}" 
+          <input type="number" id="line-rate-${idx}" class="form-control" min="0" step="0.01" value="${item.rate !== undefined && item.rate !== null ? item.rate : 0}" 
                  placeholder="0"
                  oninput="window.billingManager.updateLineItem(${idx}, 'rate', this.value)">
         </td>
@@ -303,10 +367,16 @@ class BillingManager {
       ).slice(0, 12);
     }
 
+    this.currentProductMatches = matches;
+    this.activeProductIdx = matches.length > 0 ? 0 : -1;
+
     let html = '';
     if (matches.length > 0) {
-      html += matches.map(p => `
-        <div class="autocomplete-item" onmousedown="window.billingManager.selectProductSuggestion(${index}, ${p.id})">
+      html += matches.map((p, pIdx) => `
+        <div class="autocomplete-item ${pIdx === this.activeProductIdx ? 'selected' : ''}" 
+             id="prod-sugg-${index}-${pIdx}"
+             onmouseenter="window.billingManager.setActiveProductSuggestion(${index}, ${pIdx})"
+             onmousedown="window.billingManager.selectProductSuggestion(${index}, ${p.id})">
           <div>
             <div class="autocomplete-item-title">${p.name} <span class="autocomplete-item-badge" style="margin-left: 6px;">${p.size || 'N/A'}</span></div>
             <div class="autocomplete-item-sub">Rate: <strong>₹${p.rate}</strong> • Stock: <span style="color: ${p.stock > 10 ? 'var(--success)' : 'var(--danger)'}; font-weight: 700;">${p.stock} boxes</span></div>
@@ -316,14 +386,29 @@ class BillingManager {
       `).join('');
     }
 
-    // Allow custom product entry option
+    // Option 1: Open popup to add as permanent product to Stock with all parameters
+    const safeQuery = query ? query.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
+    html += `
+      <div class="autocomplete-item" style="background-color: #f0fdf4; border-top: 1.5px dashed #86efac;" onmousedown="window.inventoryManager.openAddModal('${safeQuery}', ${index})">
+        <div>
+          <div style="font-weight: 800; color: #15803d; display: flex; align-items: center; gap: 6px;">
+            <svg class="svg-icon" style="width: 15px; height: 15px; stroke: #15803d;" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <span>+ Add ${query ? `"${query}"` : 'New Product'} to Stock (Full Details Popup)</span>
+          </div>
+          <div class="autocomplete-item-sub" style="color: #166534;">Set stock boxes, category size, rate, and HSN in Stock panel</div>
+        </div>
+        <span class="autocomplete-item-badge" style="background-color: #22c55e; color: #ffffff; font-weight: 800;">+ Stock Popup</span>
+      </div>
+    `;
+
+    // Option 2: Allow quick custom product entry option
     if (q) {
       html += `
-        <div class="autocomplete-item" style="background-color: #f8fafc; border-top: 1px dashed #cbd5e1;" onmousedown="window.billingManager.selectCustomProductEntry(${index}, '${q.replace(/'/g, "\\'")}')">
+        <div class="autocomplete-item" style="background-color: #f8fafc; border-top: 1px dashed #cbd5e1;" onmousedown="window.billingManager.selectCustomProductEntry(${index}, '${safeQuery}')">
           <div style="font-weight: 700; color: var(--accent-blue);">
-            + Use as custom item: "${query}"
+            + Use as one-time custom item: "${query}"
           </div>
-          <span class="autocomplete-item-badge">Custom</span>
+          <span class="autocomplete-item-badge">One-time</span>
         </div>
       `;
     }
@@ -335,11 +420,61 @@ class BillingManager {
     this.lineItems[index].particulars = query;
   }
 
+  onProductKeyDown(event, index) {
+    const listEl = document.getElementById(`productAutocompleteList-${index}`);
+    const isListVisible = listEl && listEl.style.display !== 'none';
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!isListVisible) {
+        this.onProductInput(index, this.lineItems[index].particulars || '');
+        return;
+      }
+      if (this.currentProductMatches && this.currentProductMatches.length > 0) {
+        this.activeProductIdx = (this.activeProductIdx + 1) % this.currentProductMatches.length;
+        this.updateProductSuggestionHighlight(index);
+      }
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (isListVisible && this.currentProductMatches && this.currentProductMatches.length > 0) {
+        this.activeProductIdx = (this.activeProductIdx - 1 + this.currentProductMatches.length) % this.currentProductMatches.length;
+        this.updateProductSuggestionHighlight(index);
+      }
+    } else if (event.key === 'Enter') {
+      if (isListVisible && this.currentProductMatches && this.activeProductIdx >= 0 && this.activeProductIdx < this.currentProductMatches.length) {
+        event.preventDefault();
+        const selected = this.currentProductMatches[this.activeProductIdx];
+        this.selectProductSuggestion(index, selected.id);
+      }
+    } else if (event.key === 'Escape') {
+      if (listEl) listEl.style.display = 'none';
+    }
+  }
+
+  setActiveProductSuggestion(lineIdx, pIdx) {
+    this.activeProductIdx = pIdx;
+    this.updateProductSuggestionHighlight(lineIdx);
+  }
+
+  updateProductSuggestionHighlight(lineIdx) {
+    const listEl = document.getElementById(`productAutocompleteList-${lineIdx}`);
+    if (!listEl) return;
+    const items = listEl.querySelectorAll('.autocomplete-item');
+    items.forEach((el, idx) => {
+      if (idx === this.activeProductIdx) {
+        el.classList.add('selected');
+        el.scrollIntoView({ block: 'nearest' });
+      } else {
+        el.classList.remove('selected');
+      }
+    });
+  }
+
   onProductBlur(index) {
     setTimeout(() => {
       const listEl = document.getElementById(`productAutocompleteList-${index}`);
       if (listEl) listEl.style.display = 'none';
-    }, 200);
+    }, 250);
   }
 
   selectProductSuggestion(index, productId) {
@@ -375,6 +510,39 @@ class BillingManager {
         boxInput.select();
       }
     }, 60);
+  }
+
+  async onProductAddedFromModal(product, index) {
+    this.products = await window.dbManager.getProducts();
+
+    if (index !== null && index !== undefined && this.lineItems[index]) {
+      this.lineItems[index].isCustom = false;
+      this.lineItems[index].particulars = product.name;
+      this.lineItems[index].tilesNo = product.size || '2x4';
+      this.lineItems[index].hsnCode = product.hsnCode || '6907';
+      this.lineItems[index].rate = product.rate;
+      if (!this.lineItems[index].boxes || this.lineItems[index].boxes === 0) {
+        this.lineItems[index].boxes = 1;
+      }
+      this.lineItems[index].amount = this.lineItems[index].boxes * product.rate;
+
+      // Auto-add new line item row if selecting on the last row
+      if (index === this.lineItems.length - 1) {
+        this.lineItems.push({ tilesNo: '', particulars: '', hsnCode: '6907', boxes: 0, rate: 0, amount: 0 });
+      }
+
+      this.renderLineItemsTable();
+      this.calculateTotals();
+
+      // Focus the boxes input of the newly added item
+      setTimeout(() => {
+        const boxInput = document.getElementById(`line-boxes-${index}`);
+        if (boxInput) {
+          boxInput.focus();
+          boxInput.select();
+        }
+      }, 80);
+    }
   }
 
   selectCustomProductEntry(index, customName) {
@@ -473,24 +641,28 @@ class BillingManager {
     const balanceDueEl = document.getElementById('calcBalanceDue');
 
     if (subtotalEl) subtotalEl.textContent = `₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (grandTotalEl) grandTotalEl.textContent = `₹${billNetTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (grandTotalEl) grandTotalEl.textContent = `₹${(this.billType === 'gst' ? billNetTotal : grandTotalWithDues).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (balanceDueEl) balanceDueEl.textContent = `₹${balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   async autoSaveCustomProducts() {
     for (const item of this.lineItems) {
-      if (item.particulars && item.particulars.trim()) {
-        const existing = this.products.find(p => p.name.toLowerCase() === item.particulars.toLowerCase());
+      const itemName = (item.particulars || '').trim();
+      if (itemName) {
+        const existing = this.products.find(p => (p.name || '').trim().toLowerCase() === itemName.toLowerCase());
         if (!existing) {
-          console.log(`Auto-saving new custom product to inventory: ${item.particulars}`);
-          await window.dbManager.saveProduct({
-            name: item.particulars,
+          console.log(`Auto-saving new custom product to inventory: ${itemName}`);
+          const newProduct = {
+            name: itemName,
             size: item.tilesNo || '2x4',
             hsnCode: item.hsnCode || '6907',
-            rate: item.rate || 0,
+            rate: parseFloat(item.rate) || 0,
             stock: 50,
             minStockAlert: 10
-          });
+          };
+          const savedId = await window.dbManager.saveProduct(newProduct);
+          newProduct.id = savedId;
+          this.products.push(newProduct);
         }
       }
     }
@@ -526,7 +698,7 @@ class BillingManager {
       const lowStockWarnings = [];
       validItems.forEach(item => {
         if (item.particulars) {
-          const prod = this.products.find(p => p.name.toLowerCase() === item.particulars.toLowerCase());
+          const prod = this.products.find(p => (p.name || '').trim().toLowerCase() === item.particulars.trim().toLowerCase());
           if (prod && prod.stock < item.boxes) {
             lowStockWarnings.push(`${item.particulars}: requested ${item.boxes} boxes, but current stock is only ${prod.stock} boxes.`);
           }
@@ -583,11 +755,14 @@ class BillingManager {
       paidAmount: advancePaid,
       balanceDue,
       status,
-      createdAt: new Date().toISOString()
+      createdAt: this.currentBillCreatedAt || new Date().toISOString()
     };
 
     if (this.currentBillId) {
       bill.id = this.currentBillId;
+      if (this.currentBillNo) {
+        bill.billNo = this.currentBillNo;
+      }
     }
 
     const savedId = await window.dbManager.saveBill(bill);
@@ -634,7 +809,7 @@ class BillingManager {
 
       billData = {
         billType: this.billType,
-        billNo: lastNo + 1,
+        billNo: this.currentBillNo || (lastNo + 1),
         customerName: document.getElementById('customerNameInput').value || '',
         customerAddress: document.getElementById('customerAddressInput').value || '',
         customerPhone: document.getElementById('customerPhoneInput').value || '',
@@ -676,8 +851,10 @@ class BillingManager {
 
   // --- GST TAX INVOICE PREVIEW REPLICA (EXACT MATCHING USER FORMAT) ---
   renderGstTaxInvoicePreview(container, billData) {
-    const paddedItems = [...(billData.items || [])];
-    while (paddedItems.length < 10) {
+    const rawItems = billData.items || [];
+    const minRows = rawItems.length <= 4 ? 5 : Math.max(rawItems.length + 1, 7);
+    const paddedItems = [...rawItems];
+    while (paddedItems.length < minRows) {
       paddedItems.push({ tilesNo: '', particulars: '', hsnCode: '', boxes: '', rate: '', amount: '' });
     }
 
@@ -704,7 +881,7 @@ class BillingManager {
         <!-- Main Header -->
         <div class="bill-gst-header-main">
           <div class="bill-gst-title">BAIG TRADERS</div>
-          <div class="bill-gst-subtitle">Near MIDC New Polic Station, Akkalkot Road, MIDC, Solapur.</div>
+          <div class="bill-gst-subtitle">Near MIDC New Police Station, Akkalkot Road, MIDC, Solapur.</div>
         </div>
 
         <!-- Meta Details Box -->
@@ -761,11 +938,11 @@ class BillingManager {
             <div style="font-weight: 800; color: #742220; margin-bottom: 4px;">Bank Name : HDFC BANK</div>
             <div><strong>Account No. :</strong> 50200059363621</div>
             <div><strong>IFSC Code :</strong> HDFC0009343</div>
-            <div><strong>Adress :</strong> Akkalkot Road, Solapur.</div>
+            <div><strong>Address :</strong> Akkalkot Road, Solapur.</div>
           </div>
           <div class="gst-tax-breakdown">
             <div class="gst-tax-row">
-              <span>Taxabil Value of goods and Service</span>
+              <span>Taxable Value of goods and Service</span>
               <strong>${subtotal.toFixed(2)}</strong>
             </div>
             <div class="gst-tax-row">
@@ -803,14 +980,19 @@ class BillingManager {
 
   // --- ESTIMATE BILL PREVIEW REPLICA ---
   renderEstimateBillPreview(container, billData) {
-    const paddedItems = [...(billData.items || [])];
-    while (paddedItems.length < 12) {
+    const rawItems = billData.items || [];
+    const minRows = rawItems.length <= 4 ? 5 : Math.max(rawItems.length + 1, 7);
+    const paddedItems = [...rawItems];
+    while (paddedItems.length < minRows) {
       paddedItems.push({ tilesNo: '', particulars: '', boxes: '', rate: '', amount: '' });
     }
 
     const subtotal = (billData.items || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const roundOff = Number(billData.roundOff || 0);
-    const total = subtotal + roundOff;
+    const previousDues = Number(billData.previousDues || 0);
+    const total = subtotal + previousDues + roundOff;
+    const paidAmount = Number(billData.paidAmount || 0);
+    const balanceDue = Number(billData.balanceDue !== undefined ? billData.balanceDue : Math.max(0, total - paidAmount));
 
     container.innerHTML = `
       <div class="bill-estimate-container">
@@ -911,26 +1093,26 @@ class BillingManager {
                 <span>Subtotal:</span>
                 <strong>₹${subtotal.toLocaleString('en-IN')}</strong>
               </div>
-              ${billData.previousDues ? `
+              ${previousDues ? `
                 <div class="summary-line-row">
                   <span>मागील (Dues):</span>
-                  <strong>₹${billData.previousDues.toLocaleString('en-IN')}</strong>
+                  <strong>₹${previousDues.toLocaleString('en-IN')}</strong>
                 </div>
               ` : ''}
               <div class="summary-line-row grand-total">
                 <span>Total:</span>
                 <strong>₹${total.toLocaleString('en-IN')}</strong>
               </div>
-              ${billData.paidAmount ? `
+              ${paidAmount ? `
                 <div class="summary-line-row">
                   <span>Adv / Cash:</span>
-                  <strong>₹${billData.paidAmount.toLocaleString('en-IN')}</strong>
+                  <strong>₹${paidAmount.toLocaleString('en-IN')}</strong>
                 </div>
               ` : ''}
-              ${billData.balanceDue ? `
+              ${balanceDue ? `
                 <div class="summary-line-row" style="color: #c8102e;">
                   <span>बाकी (Due):</span>
-                  <strong>₹${billData.balanceDue.toLocaleString('en-IN')}</strong>
+                  <strong>₹${balanceDue.toLocaleString('en-IN')}</strong>
                 </div>
               ` : ''}
             </td>
@@ -949,6 +1131,9 @@ class BillingManager {
     }
 
     this.currentBillId = bill.id;
+    this.currentBillNo = bill.billNo || null;
+    this.currentBillStatus = bill.status || 'draft';
+    this.currentBillCreatedAt = bill.createdAt || new Date().toISOString();
     await window.appRouter.switchView('billing');
 
     const titleEl = document.getElementById('billingFormTitle');
@@ -1140,7 +1325,7 @@ class BillingManager {
     // Refresh UI
     await window.appRouter.loadBillsList();
     if (window.appRouter.currentView === 'inventory') {
-      await window.inventoryManager.loadInventory();
+      await window.inventoryManager.loadProducts();
     }
   }
 
@@ -1205,6 +1390,13 @@ class BillingManager {
 }
 
 window.billingManager = new BillingManager();
+
+// Prevent mouse wheel / scroll from altering number input values when selected or hovered
+document.addEventListener('wheel', (e) => {
+  if (document.activeElement && document.activeElement.type === 'number') {
+    document.activeElement.blur();
+  }
+}, { passive: true });
 
 // Global click and keydown listener to close autocomplete dropdowns
 document.addEventListener('click', (e) => {

@@ -76,9 +76,10 @@ class DatabaseManager {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeNames, mode);
       const stores = storeNames.map(name => tx.objectStore(name));
+      let result;
       tx.oncomplete = () => resolve(result);
       tx.onerror = () => reject(tx.error);
-      const result = callback(...stores);
+      result = callback(...stores);
     });
   }
 
@@ -301,22 +302,37 @@ class DatabaseManager {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('customers', 'readwrite');
       const store = tx.objectStore('customers');
+      tx.onerror = (e) => reject(tx.error || e);
 
-      // Check if customer with same phone already exists
-      const phoneReq = store.index('phone').get(customer.phone);
-      phoneReq.onsuccess = () => {
-        const existing = phoneReq.result;
-        if (existing && !customer.id) {
-          // Update existing customer details
-          existing.name = customer.name;
-          existing.address = customer.address;
-          store.put(existing);
-          resolve(existing.id);
-        } else {
+      const cleanPhone = (customer.phone || '').trim();
+      // Only attempt phone-based matching if customer has a valid phone number and no explicit ID
+      if (cleanPhone && cleanPhone.length >= 6 && !customer.id) {
+        const phoneReq = store.index('phone').get(cleanPhone);
+        phoneReq.onerror = () => {
           const req = store.put(customer);
           req.onsuccess = () => resolve(req.result);
-        }
-      };
+          req.onerror = () => reject(req.error);
+        };
+        phoneReq.onsuccess = () => {
+          const existing = phoneReq.result;
+          if (existing) {
+            existing.name = customer.name || existing.name;
+            existing.address = customer.address || existing.address;
+            if (customer.gstin) existing.gstin = customer.gstin;
+            const putReq = store.put(existing);
+            putReq.onsuccess = () => resolve(existing.id);
+            putReq.onerror = () => reject(putReq.error);
+          } else {
+            const req = store.put(customer);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          }
+        };
+      } else {
+        const req = store.put(customer);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }
     });
   }
 
@@ -344,47 +360,66 @@ class DatabaseManager {
   async saveBill(bill) {
     await this.init();
     return new Promise(async (resolve, reject) => {
-      // 1. Ensure customer is saved/updated
-      let customerId = bill.customerId;
-      if (!customerId && bill.customerName) {
-        customerId = await this.saveCustomer({
-          name: bill.customerName,
-          phone: bill.customerPhone,
-          address: bill.customerAddress,
-          createdAt: new Date().toISOString().split('T')[0]
-        });
+      try {
+        // 1. Ensure customer is saved/updated
+        let customerId = bill.customerId;
+        if (!customerId && bill.customerName) {
+          customerId = await this.saveCustomer({
+            name: bill.customerName,
+            phone: bill.customerPhone || '',
+            address: bill.customerAddress || '',
+            gstin: bill.customerGstin || '',
+            createdAt: new Date().toISOString().split('T')[0]
+          });
+        }
+        bill.customerId = customerId;
+
+        // 2. If bill is being Finalized for the first time, auto-increment billNo and deduct stock
+        if (bill.status === 'finalized') {
+          let shouldDeduct = false;
+          if (!bill.billNo || bill.billNo === 0) {
+            const lastNo = (await this.getSetting('lastBillNo')) || 941;
+            const nextNo = lastNo + 1;
+            bill.billNo = nextNo;
+            await this.setSetting('lastBillNo', nextNo);
+            shouldDeduct = true;
+          } else if (bill.id) {
+            const oldBill = await this.getBillById(bill.id);
+            if (oldBill && oldBill.status === 'draft') {
+              shouldDeduct = true;
+            }
+          }
+
+          if (shouldDeduct) {
+            await this.deductInventoryStock(bill.items);
+          }
+        }
+
+        // 3. Save bill object
+        const tx = this.db.transaction('bills', 'readwrite');
+        const store = tx.objectStore('bills');
+        const req = store.put(bill);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      } catch (err) {
+        reject(err);
       }
-      bill.customerId = customerId;
-
-      // 2. If bill is being Finalized, auto-increment billNo and deduct stock
-      if (bill.status === 'finalized' && (!bill.billNo || bill.billNo === 0)) {
-        const lastNo = await this.getSetting('lastBillNo') || 941;
-        const nextNo = lastNo + 1;
-        bill.billNo = nextNo;
-        await this.setSetting('lastBillNo', nextNo);
-
-        // Deduct product stock
-        await this.deductInventoryStock(bill.items);
-      }
-
-      // 3. Save bill object
-      const tx = this.db.transaction('bills', 'readwrite');
-      const store = tx.objectStore('bills');
-      const req = store.put(bill);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
     });
   }
 
   async deductInventoryStock(billItems) {
+    if (!billItems || !Array.isArray(billItems) || billItems.length === 0) return;
     const products = await this.getProducts();
     const tx = this.db.transaction('products', 'readwrite');
     const store = tx.objectStore('products');
 
     for (const item of billItems) {
-      const prod = products.find(p => p.name.toLowerCase() === item.particulars.toLowerCase());
+      const itemName = (item.particulars || '').trim().toLowerCase();
+      if (!itemName) continue;
+      const prod = products.find(p => (p.name || '').trim().toLowerCase() === itemName);
       if (prod) {
-        prod.stock = Math.max(0, prod.stock - parseInt(item.boxes || 0, 10));
+        const qty = parseInt(item.boxes || 0, 10);
+        prod.stock = Math.max(0, (prod.stock || 0) - qty);
         store.put(prod);
       }
     }
@@ -395,7 +430,7 @@ class DatabaseManager {
     if (!bill) return false;
 
     bill.paidAmount = (bill.paidAmount || 0) + paymentAmount;
-    bill.balanceDue = Math.max(0, bill.total - bill.paidAmount);
+    bill.balanceDue = Math.max(0, (bill.balanceDue || 0) - paymentAmount);
 
     await this.saveBill(bill);
     return true;
@@ -424,8 +459,10 @@ class DatabaseManager {
   }
 
   async restockProduct(productName, quantity) {
+    const cleanName = (productName || '').trim().toLowerCase();
+    if (!cleanName) return;
     const products = await this.getProducts();
-    const prod = products.find(p => p.name.toLowerCase() === productName.toLowerCase());
+    const prod = products.find(p => (p.name || '').trim().toLowerCase() === cleanName);
     if (prod) {
       prod.stock = (prod.stock || 0) + parseInt(quantity || 0, 10);
       await this.saveProduct(prod);
